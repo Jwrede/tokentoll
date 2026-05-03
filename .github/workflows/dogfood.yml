@@ -1,0 +1,38 @@
+name: Dogfood Cost Diff
+on:
+  pull_request:
+    paths: ["**.py"]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  cost-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tokentoll from source
+        run: pip install -e .
+
+      - name: Run cost diff
+        id: diff
+        run: |
+          COMMENT=$(tokentoll diff \
+            --base="${{ github.event.pull_request.base.sha }}" \
+            --head="${{ github.event.pull_request.head.sha }}" \
+            --format=markdown 2>&1) || true
+          echo "${COMMENT}" > /tmp/tokentoll-comment.md
+          cat /tmp/tokentoll-comment.md
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: tokentoll
+          path: /tmp/tokentoll-comment.md
