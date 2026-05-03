@@ -84,12 +84,12 @@ class LangChainDetector(BaseDetector):
             model_node = get_keyword_value(node, "model") or get_keyword_value(node, "model_name")
             if model_node is None and node.args:
                 model_node = node.args[0]
-            model = resolve_string(model_node, variables)
+            model = resolve_string(model_node, variables, call=node, kwarg_name="model")
 
             max_tokens_node = get_keyword_value(node, "max_tokens") or get_keyword_value(
                 node, "max_output_tokens"
             )
-            max_tokens = resolve_int(max_tokens_node, variables)
+            max_tokens = resolve_int(max_tokens_node, variables, call=node, kwarg_name="max_tokens")
 
             calls.append(
                 LLMCall(

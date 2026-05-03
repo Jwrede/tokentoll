@@ -71,13 +71,13 @@ class OpenAIDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = resolve_string(model_node, variables)
+            model = resolve_string(model_node, variables, call=node, kwarg_name="model")
             model_is_literal = (
                 model_node is not None and extract_string_literal(model_node) is not None
             )
 
             max_tokens_node = get_keyword_value(node, "max_tokens")
-            max_tokens = resolve_int(max_tokens_node, variables)
+            max_tokens = resolve_int(max_tokens_node, variables, call=node, kwarg_name="max_tokens")
 
             est_input = None
             est_output = max_tokens

@@ -68,10 +68,10 @@ class AnthropicDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = resolve_string(model_node, variables)
+            model = resolve_string(model_node, variables, call=node, kwarg_name="model")
 
             max_tokens_node = get_keyword_value(node, "max_tokens")
-            max_tokens = resolve_int(max_tokens_node, variables)
+            max_tokens = resolve_int(max_tokens_node, variables, call=node, kwarg_name="max_tokens")
 
             est_input = None
             messages_node = get_keyword_value(node, "messages")

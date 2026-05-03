@@ -71,7 +71,7 @@ class GoogleDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = resolve_string(model_node, variables)
+            model = resolve_string(model_node, variables, call=node, kwarg_name="model")
 
             max_tokens = _extract_max_output_tokens(node)
 

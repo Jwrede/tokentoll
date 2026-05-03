@@ -132,6 +132,66 @@ def call_llm(model="gpt-4o", max_tokens=1000):
     assert calls[0].max_tokens == 1000
 
 
+def test_kwargs_splatting():
+    source = """
+from openai import OpenAI
+client = OpenAI()
+kwargs = {"model": "gpt-4o", "max_tokens": 2000}
+client.chat.completions.create(**kwargs)
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+    assert calls[0].max_tokens == 2000
+
+
+def test_kwargs_subscript_assignment():
+    source = """
+from openai import OpenAI
+client = OpenAI()
+kwargs = {}
+kwargs["model"] = "gpt-4o-mini"
+client.chat.completions.create(**kwargs)
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o-mini"
+
+
+def test_class_attribute_default():
+    source = """
+from openai import OpenAI
+
+class Config:
+    model: str = "gpt-4o"
+
+client = OpenAI()
+config = Config()
+client.chat.completions.create(model=config.model, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
+def test_constructor_arg_propagation():
+    source = """
+import litellm
+
+DEFAULT_MODEL = "gpt-4o"
+
+class LLMClient:
+    def __init__(self, model_name):
+        self.name = model_name
+
+client = LLMClient(DEFAULT_MODEL)
+litellm.completion(model=client.name, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
 def test_module_level_import():
     source = """
 import openai
