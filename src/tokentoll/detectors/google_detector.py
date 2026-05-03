@@ -29,7 +29,9 @@ class GoogleDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         if find_imports(tree, "google.genai") or find_imports(tree, "google"):
             return True
-        return bool(find_imports_by_name(tree, {"genai"}))
+        if find_imports_by_name(tree, {"genai"}):
+            return True
+        return "generate_content" in source
 
     def detect(
         self,

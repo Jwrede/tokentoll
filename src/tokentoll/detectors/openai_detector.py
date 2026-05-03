@@ -36,7 +36,9 @@ class OpenAIDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         if find_imports(tree, "openai"):
             return True
-        return bool(find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"}))
+        if find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"}):
+            return True
+        return "completions.create" in source or "embeddings.create" in source
 
     def detect(
         self,

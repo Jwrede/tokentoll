@@ -31,7 +31,9 @@ class AnthropicDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         if find_imports(tree, "anthropic"):
             return True
-        return bool(find_imports_by_name(tree, _CLIENT_CLASSES | {"anthropic"}))
+        if find_imports_by_name(tree, _CLIENT_CLASSES | {"anthropic"}):
+            return True
+        return ".messages.create" in source
 
     def detect(
         self,
