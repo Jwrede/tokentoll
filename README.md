@@ -8,7 +8,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 A CLI tool and GitHub Action that statically analyzes your code for LLM API calls,
-estimates their cost, and shows you the cost impact of every change -- in your
+estimates their cost, and shows you the cost impact of every change in your
 terminal or as a PR comment. Zero runtime dependencies.
 
 ## The Problem
@@ -18,7 +18,7 @@ A new API call in a hot path can add **$10,000/month** to your bill.
 These changes hide in normal code review.
 
 tokentoll finds LLM API calls in your code, estimates their cost,
-and shows you the cost impact of every change -- before it hits production.
+and shows you the cost impact of every change before it hits production.
 
 ## Quick Start
 
@@ -55,9 +55,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: Jwrede/tokentoll@v1
-        with:
-          calls-per-month: "5000"
+      - uses: Jwrede/tokentoll@v0.5.0
 ```
 
 ## What It Detects
@@ -69,7 +67,7 @@ jobs:
 | Google GenAI | `models.generate_content` | Supported |
 | LiteLLM | `completion`, `acompletion` | Supported |
 | LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
-| JS/TS SDKs | -- | Planned |
+| JS/TS SDKs | | Planned |
 
 ## Example Output
 
@@ -159,8 +157,8 @@ Monthly cost impact: +$0.30
 ## CLI Reference
 
 ```
-tokentoll scan [PATH...] [--format table|json|markdown] [--calls-per-month N]
-tokentoll diff [REF] [--base REF] [--head REF] [--format table|json|markdown|github-comment]
+tokentoll scan [PATH...] [--format table|json|markdown] [--calls-per-month N] [--config PATH]
+tokentoll diff [REF] [--base REF] [--head REF] [--format table|json|markdown|github-comment] [--config PATH]
 tokentoll update    # Update bundled pricing data
 ```
 
@@ -175,6 +173,66 @@ tokentoll update
 Pricing data is sourced from LiteLLM's `model_prices_and_context_window.json`
 and covers 300+ models across OpenAI, Anthropic, Google, AWS Bedrock,
 Azure, and more.
+
+## Dynamic Model Defaults
+
+When tokentoll encounters a call where the model name is a variable it cannot resolve,
+it applies a sensible per-SDK default so you still get cost estimates:
+
+| SDK | Default Model |
+|-----|---------------|
+| OpenAI | `gpt-4o` |
+| Anthropic | `claude-sonnet-4-20250514` |
+| Google GenAI | `gemini-2.0-flash` |
+| LiteLLM | `gpt-4o` |
+| LangChain | `gpt-4o` |
+
+These defaults are shown as `gpt-4o (default)` in scan output. You can override
+them per-project or per-path using a `.tokentoll.yml` config file (see below).
+
+## Configuration
+
+Create a `.tokentoll.yml` in your project root to customize behavior.
+tokentoll automatically finds this file by walking up from the scanned directory.
+
+```yaml
+# Default model for all dynamic (unresolved) calls
+default_model: gpt-4o
+
+# Per-SDK defaults (override the built-in defaults above)
+default_models:
+  openai: gpt-4o-mini
+  anthropic: claude-haiku-3-20240307
+
+# Assumed calls per month per call site
+calls_per_month: 5000
+
+# Per-path overrides (longest prefix match)
+overrides:
+  - path: tests/
+    calls_per_month: 100
+  - path: src/agents/
+    default_model: gpt-4o
+    calls_per_month: 10000
+```
+
+Resolution order for dynamic model defaults: per-SDK config (`default_models`) >
+generic config (`default_model`) > built-in SDK defaults.
+
+You can also pass `--config path/to/.tokentoll.yml` to use a specific config file.
+
+## Token Estimation
+
+By default, tokentoll estimates token counts using a characters/4 heuristic.
+For more accurate estimates, install [tiktoken](https://github.com/openai/tiktoken):
+
+```bash
+pip install tiktoken
+```
+
+When tiktoken is available, tokentoll uses the correct tokenizer encoding for
+each model. Unknown models fall back to `cl100k_base`. Tiktoken is lazy-loaded
+and encoders are cached, so there is no startup penalty if you don't need it.
 
 ## Smart Variable Resolution
 
@@ -203,11 +261,13 @@ client.chat.completions.create(**kwargs)
 
 ## Limitations
 
-- Cannot resolve models loaded from external config files or databases at runtime
-  (these are flagged as dynamic but not priced)
-- Token estimates use a character/4 heuristic unless tiktoken is installed
-- Monthly estimates assume uniform call volume (configurable via `--calls-per-month`)
-- Python only for now (JS/TS support planned)
+- Cannot resolve models loaded from external config files or databases at runtime.
+  These calls use per-SDK defaults (configurable via `.tokentoll.yml`).
+- Token estimates use a characters/4 heuristic unless
+  [tiktoken](https://github.com/openai/tiktoken) is installed.
+- Monthly estimates assume uniform call volume (configurable via `--calls-per-month`
+  or `.tokentoll.yml`).
+- Python only for now (JS/TS support planned).
 
 ## License
 
