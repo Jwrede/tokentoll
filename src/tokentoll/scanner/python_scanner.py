@@ -6,20 +6,40 @@ from pathlib import Path
 from tokentoll.core.models import LLMCall
 from tokentoll.detectors.registry import get_all_detectors
 
+_QUICK_REJECT_PATTERNS = (
+    "openai",
+    "anthropic",
+    "genai",
+    "google",
+    "litellm",
+    "langchain",
+    "completions.create",
+    "messages.create",
+    "embeddings.create",
+    "generate_content",
+    "completion(",
+)
+
 
 def scan_source(source: str, file_path: str) -> list[LLMCall]:
     """Scan Python source code for LLM API calls."""
+    if not any(p in source for p in _QUICK_REJECT_PATTERNS):
+        return []
+
     try:
         tree = ast.parse(source, filename=file_path)
     except SyntaxError:
         return []
 
+    detectors = [d for d in get_all_detectors() if d.can_handle(tree, source)]
+    if not detectors:
+        return []
+
     variables = build_variable_map(tree)
 
     calls: list[LLMCall] = []
-    for detector in get_all_detectors():
-        if detector.can_handle(tree, source):
-            calls.extend(detector.detect(tree, file_path, variables))
+    for detector in detectors:
+        calls.extend(detector.detect(tree, file_path, variables))
     return calls
 
 
@@ -229,14 +249,16 @@ def _collect_constants(tree: ast.Module, variables: dict[str, str | int]) -> Non
 
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             defaults = node.args.defaults
-            args = node.args.args
+            all_args = node.args.posonlyargs + node.args.args
             if defaults:
-                offset = len(args) - len(defaults)
+                offset = len(all_args) - len(defaults)
                 for i, default in enumerate(defaults):
-                    arg_name = args[offset + i].arg
-                    val = _extract_constant_value(default)
-                    if val is not None:
-                        variables[arg_name] = val
+                    idx = offset + i
+                    if 0 <= idx < len(all_args):
+                        arg_name = all_args[idx].arg
+                        val = _extract_constant_value(default)
+                        if val is not None:
+                            variables[arg_name] = val
 
             for kwarg, default in zip(node.args.kwonlyargs, node.args.kw_defaults):
                 if default is not None:
