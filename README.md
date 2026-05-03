@@ -2,9 +2,14 @@
 
 > Catch LLM cost changes in code review. Infracost for LLM spend.
 
+[![CI](https://github.com/Jwrede/tokentoll/actions/workflows/ci.yml/badge.svg)](https://github.com/Jwrede/tokentoll/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/tokentoll)](https://pypi.org/project/tokentoll/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 A CLI tool and GitHub Action that statically analyzes your code for LLM API calls,
 estimates their cost, and shows you the cost impact of every change -- in your
-terminal or as a PR comment.
+terminal or as a PR comment. Zero runtime dependencies.
 
 ## The Problem
 
@@ -66,11 +71,86 @@ jobs:
 | LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
 | JS/TS SDKs | -- | Planned |
 
+## Example Output
+
+### `tokentoll scan`
+
+```
+LLM API Calls Detected
+============================================================
+
+File: src/agents/summarizer.py
+  Line 42: openai client.chat.completions.create
+           Model: gpt-4o | Max tokens: 4096
+           Est. cost/call: $0.03 | Monthly (1000 calls/month per call site): $26.50
+
+  Line 78: openai client.chat.completions.create
+           Model: gpt-4o-mini | Max tokens: 1000
+           Est. cost/call: $0.000301 | Monthly (1000 calls/month per call site): $0.30
+
+--
+Total estimated monthly cost: $26.80
+  1000 calls/month per call site
+```
+
+### `tokentoll diff`
+
+```
+LLM Cost Diff: main..feature-branch
+============================================================
+
++ ADDED    src/agents/rewriter.py:35
+           openai | Model: gpt-4o
+           Est. cost/call: $0.03 | Monthly: +$26.50
+
+~ MODIFIED src/agents/summarizer.py:42
+           openai | Model: gpt-4o -> gpt-4o-mini
+           Est. cost/call: $0.03 -> $0.000301 | Monthly: -$26.20
+
+--
+Monthly cost impact: +$0.30
+  Added: 1 | Changed: 1 | Removed: 0
+  1000 calls/month per call site
+```
+
 ## How It Works
+
+```
+  Source Code (.py files)
+         |
+         v
+  +-------------+     +------------------+
+  | AST Scanner |---->| SDK Detectors    |
+  | (ast.parse) |     | OpenAI, Anthropic|
+  +-------------+     | Google, LiteLLM  |
+                       | LangChain        |
+                       +------------------+
+                              |
+                              v
+                       +------------------+
+                       | Pricing Engine   |
+                       | 2200+ models     |
+                       | Auto-cached      |
+                       +------------------+
+                              |
+                  +-----------+-----------+
+                  |                       |
+                  v                       v
+           +------------+         +-------------+
+           | Scan Report|         | Diff Engine  |
+           | (costs)    |         | (old vs new) |
+           +------------+         +-------------+
+                  |                       |
+                  v                       v
+           +------------+         +-------------+
+           | Table/JSON |         | Table/JSON/  |
+           |            |         | PR Comment   |
+           +------------+         +-------------+
+```
 
 1. Parses Python files using the `ast` module to find LLM API calls
 2. Extracts model name, max_tokens, and prompt content where possible
-3. Looks up pricing from a bundled database (sourced from LiteLLM, 300+ models)
+3. Looks up pricing from a local cache (sourced from LiteLLM, 2200+ models)
 4. For diff mode: compares calls between two git refs and computes the cost delta
 5. Outputs a cost report as a table, JSON, or GitHub PR comment
 
