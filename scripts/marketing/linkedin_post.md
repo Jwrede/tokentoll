@@ -15,6 +15,9 @@ How it works:
 
 Think Infracost, but for LLM API spend.
 
+Validated against real open-source projects: found 1,387 LLM calls in LiteLLM,
+429 in LangChain, 1,834 total across 5 repos. Zero crashes.
+
 Zero runtime dependencies. MIT licensed. Works as a GitHub Action with
 automatic PR comments.
 
