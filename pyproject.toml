@@ -1,6 +1,6 @@
 [project]
 name = "tokentoll"
-version = "0.4.0"
+version = "0.5.0"
 description = "Catch LLM cost changes in code review. Infracost for LLM spend."
 readme = "README.md"
 license = {text = "MIT"}
