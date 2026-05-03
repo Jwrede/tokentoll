@@ -6,7 +6,7 @@ openai_client = OpenAI()
 anthropic_client = Anthropic()
 
 r1 = openai_client.chat.completions.create(
-    model="gpt-4o-mini",
+    model="gpt-4o",
     max_tokens=2000,
     messages=[{"role": "user", "content": "Hello"}],
 )
@@ -22,4 +22,10 @@ r3 = litellm.completion(
     model="gpt-4o-mini",
     max_tokens=500,
     messages=[{"role": "user", "content": "Quick question"}],
+)
+
+r4 = openai_client.chat.completions.create(
+    model="gpt-4o",
+    max_tokens=4096,
+    messages=[{"role": "user", "content": "Summarize this document"}],
 )
