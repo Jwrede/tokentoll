@@ -11,6 +11,10 @@ A CLI tool and GitHub Action that statically analyzes your code for LLM API call
 estimates their cost, and shows you the cost impact of every change in your
 terminal or as a PR comment. Zero runtime dependencies.
 
+<p align="center">
+  <img src="demo/demo.gif" alt="tokentoll demo" width="720">
+</p>
+
 ## The Problem
 
 A single model swap from `gpt-4o-mini` to `gpt-4o` increases costs **15x**.
