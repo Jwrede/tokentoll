@@ -49,23 +49,46 @@ runs:
         INPUT_BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
         INPUT_HEAD_REF: ${{ inputs.head-ref || github.event.pull_request.head.sha }}
       run: |
-        COMMENT=$(tokentoll diff \
+        DIFF_JSON=$(tokentoll diff \
           --base="${INPUT_BASE_REF}" \
           --head="${INPUT_HEAD_REF}" \
           --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
-          --format=github-comment 2>&1) || true
+          --format=json 2>/dev/null) || true
 
-        DELTA=$(tokentoll diff \
-          --base="${INPUT_BASE_REF}" \
-          --head="${INPUT_HEAD_REF}" \
-          --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
-          --format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_monthly_delta', 0))") || true
-
+        DELTA=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_monthly_delta', 0))" 2>/dev/null) || DELTA=0
+        HAS_CHANGES=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('diffs') else 'false')" 2>/dev/null) || HAS_CHANGES=false
         echo "monthly-delta=${DELTA}" >> "$GITHUB_OUTPUT"
-        echo "${COMMENT}" > /tmp/tokentoll-comment.md
+        echo "has-changes=${HAS_CHANGES}" >> "$GITHUB_OUTPUT"
+
+        if [ "${HAS_CHANGES}" = "true" ]; then
+          COMMENT=$(tokentoll diff \
+            --base="${INPUT_BASE_REF}" \
+            --head="${INPUT_HEAD_REF}" \
+            --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+            --format=github-comment 2>&1) || true
+          echo "${COMMENT}" > /tmp/tokentoll-comment.md
+        fi
+
+        # First run: this PR adds tokentoll to the project.
+        ADDS_TOKENTOLL=$(git diff "${INPUT_BASE_REF}" "${INPUT_HEAD_REF}" 2>/dev/null | grep -q "^+.*Jwrede/tokentoll" && echo true || echo false)
+        if [ "${HAS_CHANGES}" = "false" ] && [ "${ADDS_TOKENTOLL}" = "true" ]; then
+          SCAN=$(tokentoll scan . \
+            --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+            --format=markdown 2>&1) || true
+          if echo "${SCAN}" | grep -q "Est. Cost/Call"; then
+            {
+              echo "## tokentoll -- Initial Scan"
+              echo ""
+              echo "Here's what tokentoll found in this project. Future PRs that change LLM calls will get a cost diff comment automatically."
+              echo ""
+              echo "${SCAN}" | tail -n +2
+            } > /tmp/tokentoll-comment.md
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+          fi
+        fi
 
     - name: Post PR comment
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && steps.run.outputs.has-changes == 'true'
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         GITHUB_TOKEN: ${{ inputs.github-token }}
