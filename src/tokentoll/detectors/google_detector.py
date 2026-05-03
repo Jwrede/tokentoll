@@ -58,7 +58,6 @@ class GoogleDetector(BaseDetector):
             if call_type is None:
                 continue
 
-
             model_node = get_keyword_value(node, "model")
             model = resolve_string(model_node, variables, call=node, kwarg_name="model")
 
