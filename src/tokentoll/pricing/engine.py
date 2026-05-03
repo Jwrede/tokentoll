@@ -127,6 +127,22 @@ class PricingEngine:
             if "/" in key and key.split("/", 1)[1].lower() == lower:
                 return (key, val)
 
+        # Strip provider prefix and try again (e.g., "bedrock/us.anthropic.X" -> "us.anthropic.X")
+        if "/" in name:
+            after_slash = name.split("/", 1)[1]
+            result = self._try_resolve(after_slash, sdk)
+            if result:
+                return result
+
+        # Strip region prefix (e.g., "us.anthropic.X" -> "anthropic.X")
+        _REGION_PREFIXES = ("us.", "eu.", "apac.", "ap.")
+        lower_name = name.lower()
+        for prefix in _REGION_PREFIXES:
+            if lower_name.startswith(prefix):
+                result = self._try_resolve(name[len(prefix) :], sdk)
+                if result:
+                    return result
+
         stripped = _DATE_SUFFIX_RE.sub("", name)
         if stripped != name:
             result = self._try_resolve(stripped, sdk)
