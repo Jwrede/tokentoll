@@ -48,7 +48,14 @@ def run_scan(
     for call in calls:
         resolved = resolve_for_path(config, call.file_path)
         cpm = calls_per_month or resolved.calls_per_month or effective_cpm
-        estimates.append(engine.estimate(call, cpm, default_model=resolved.default_model))
+        estimates.append(
+            engine.estimate(
+                call,
+                cpm,
+                default_model=resolved.default_model,
+                default_models=resolved.default_models,
+            )
+        )
 
     report = _build_scan_report(estimates, effective_cpm, engine.warnings)
 

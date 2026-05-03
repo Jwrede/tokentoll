@@ -23,8 +23,9 @@ def compute_diff(
         new_calls = new_calls_map.get(fpath, [])
         resolved = resolve_for_path(config, fpath) if config else None
         dm = resolved.default_model if resolved else None
+        dms = resolved.default_models if resolved else None
         cpm = resolved.calls_per_month if resolved and resolved.calls_per_month else calls_per_month
-        diffs.extend(_diff_file(old_calls, new_calls, engine, cpm, dm))
+        diffs.extend(_diff_file(old_calls, new_calls, engine, cpm, dm, dms))
 
     return diffs
 
@@ -35,6 +36,7 @@ def _diff_file(
     engine: PricingEngine,
     calls_per_month: int,
     default_model: str | None = None,
+    default_models: dict[str, str] | None = None,
 ) -> list[CallDiff]:
     matched_old: set[int] = set()
     matched_new: set[int] = set()
@@ -47,8 +49,18 @@ def _diff_file(
             matched_new.add(ni)
             oc = old_calls[best_oi]
 
-            old_est = engine.estimate(oc, calls_per_month, default_model=default_model)
-            new_est = engine.estimate(nc, calls_per_month, default_model=default_model)
+            old_est = engine.estimate(
+                oc,
+                calls_per_month,
+                default_model=default_model,
+                default_models=default_models,
+            )
+            new_est = engine.estimate(
+                nc,
+                calls_per_month,
+                default_model=default_model,
+                default_models=default_models,
+            )
 
             if _calls_differ(oc, nc):
                 delta = _compute_delta(old_est.monthly_estimate, new_est.monthly_estimate)
@@ -69,7 +81,12 @@ def _diff_file(
 
     for ni, nc in enumerate(new_calls):
         if ni not in matched_new:
-            est = engine.estimate(nc, calls_per_month, default_model=default_model)
+            est = engine.estimate(
+                nc,
+                calls_per_month,
+                default_model=default_model,
+                default_models=default_models,
+            )
             diffs.append(
                 CallDiff(
                     change_type=ChangeType.ADDED,
@@ -82,7 +99,12 @@ def _diff_file(
 
     for oi, oc in enumerate(old_calls):
         if oi not in matched_old:
-            est = engine.estimate(oc, calls_per_month, default_model=default_model)
+            est = engine.estimate(
+                oc,
+                calls_per_month,
+                default_model=default_model,
+                default_models=default_models,
+            )
             monthly = -est.monthly_estimate if est.monthly_estimate else None
             cost = -est.estimated_cost_per_call if est.estimated_cost_per_call else None
             diffs.append(

@@ -54,7 +54,7 @@ def test_estimate_unknown_model():
     assert "Unknown model" in est.notes[0]
 
 
-def test_estimate_dynamic_model():
+def test_estimate_dynamic_model_uses_sdk_default():
     call = LLMCall(
         file_path="test.py",
         line_number=1,
@@ -66,7 +66,8 @@ def test_estimate_dynamic_model():
     )
     engine = PricingEngine()
     est = engine.estimate(call)
-    assert est.model_found is False
+    assert est.model_found is True
+    assert est.used_default_model == "gpt-4o"
     assert "dynamic" in est.notes[0].lower()
 
 
@@ -120,3 +121,54 @@ def test_estimate_resolved_model_ignores_default():
     est = engine.estimate(call, default_model="gpt-4o-mini")
     assert est.used_default_model is None
     assert est.model_found is True
+
+
+def test_estimate_dynamic_anthropic_uses_claude_default():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="anthropic",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(call)
+    assert est.model_found is True
+    assert est.used_default_model == "claude-sonnet-4-20250514"
+
+
+def test_estimate_dynamic_google_uses_gemini_default():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="google_genai",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(call)
+    assert est.model_found is True
+    assert est.used_default_model == "gemini-2.0-flash"
+
+
+def test_estimate_per_sdk_config_overrides_builtin():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="openai",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(
+        call,
+        default_models={"openai": "gpt-4o-mini"},
+    )
+    assert est.model_found is True
+    assert est.used_default_model == "gpt-4o-mini"

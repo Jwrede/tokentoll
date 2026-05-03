@@ -9,12 +9,14 @@ from pathlib import Path
 class PathOverride:
     path: str
     default_model: str | None = None
+    default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
 
 
 @dataclass
 class ProjectConfig:
     default_model: str | None = None
+    default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
     overrides: list[PathOverride] = field(default_factory=list)
     project_root: str | None = None
@@ -23,6 +25,7 @@ class ProjectConfig:
 @dataclass
 class ResolvedConfig:
     default_model: str | None = None
+    default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
 
 
@@ -68,14 +71,16 @@ def resolve_for_path(config: ProjectConfig, file_path: str) -> ResolvedConfig:
                 best_len = len(prefix)
 
     dm = config.default_model
+    dms = dict(config.default_models)
     cpm = config.calls_per_month
     if best:
         if best.default_model is not None:
             dm = best.default_model
+        dms.update(best.default_models)
         if best.calls_per_month is not None:
             cpm = best.calls_per_month
 
-    return ResolvedConfig(default_model=dm, calls_per_month=cpm)
+    return ResolvedConfig(default_model=dm, default_models=dms, calls_per_month=cpm)
 
 
 def _parse_config_file(path: Path) -> ProjectConfig:
@@ -86,8 +91,16 @@ def _parse_config_file(path: Path) -> ProjectConfig:
     return config
 
 
+def _parse_default_models(data: dict) -> dict[str, str]:
+    raw = data.get("default_models")
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items() if v is not None}
+    return {}
+
+
 def _data_to_config(data: dict) -> ProjectConfig:
     dm = data.get("default_model")
+    dms = _parse_default_models(data)
     cpm = data.get("calls_per_month")
     if cpm is not None:
         cpm = int(cpm)
@@ -100,11 +113,14 @@ def _data_to_config(data: dict) -> ProjectConfig:
                 PathOverride(
                     path=str(item["path"]),
                     default_model=item.get("default_model"),
+                    default_models=_parse_default_models(item),
                     calls_per_month=int(o_cpm) if o_cpm is not None else None,
                 )
             )
 
-    return ProjectConfig(default_model=dm, calls_per_month=cpm, overrides=overrides)
+    return ProjectConfig(
+        default_model=dm, default_models=dms, calls_per_month=cpm, overrides=overrides
+    )
 
 
 _KV_RE = re.compile(r"^(\w[\w_]*):\s*(.+)$")
@@ -113,10 +129,11 @@ _KV_RE = re.compile(r"^(\w[\w_]*):\s*(.+)$")
 def _parse_simple_yaml(text: str) -> dict:
     """Minimal YAML subset parser for .tokentoll.yml.
 
-    Handles: top-level key: value, list items (- key: value), one level of nesting.
+    Handles: top-level scalars, nested dicts (one level), and lists of dicts.
     """
     result: dict = {}
-    current_list_key: str | None = None
+    current_block_key: str | None = None
+    current_block_is_list = False
     current_item: dict | None = None
     lines = text.split("\n")
 
@@ -127,46 +144,53 @@ def _parse_simple_yaml(text: str) -> dict:
 
         indent = len(line) - len(line.lstrip())
 
-        # List item: "  - key: value" or "    key: value" continuation
-        if stripped.lstrip().startswith("- "):
-            if current_list_key is None:
+        if indent > 0 and current_block_key is not None:
+            # List item start
+            if stripped.lstrip().startswith("- "):
+                current_block_is_list = True
+                if current_item is not None:
+                    result.setdefault(current_block_key, []).append(current_item)
+                content = stripped.lstrip()[2:].strip()
+                current_item = {}
+                m = _KV_RE.match(content)
+                if m:
+                    current_item[m.group(1)] = _parse_scalar(m.group(2))
                 continue
-            if current_item is not None:
-                result.setdefault(current_list_key, []).append(current_item)
-            content = stripped.lstrip()[2:].strip()
-            current_item = {}
-            m = _KV_RE.match(content)
-            if m:
-                current_item[m.group(1)] = _parse_scalar(m.group(2))
-            continue
 
-        if indent >= 4 and current_item is not None:
-            m = _KV_RE.match(stripped.strip())
-            if m:
-                current_item[m.group(1)] = _parse_scalar(m.group(2))
-            continue
+            # Continuation of a list item (deeper indent)
+            if current_block_is_list and current_item is not None and indent >= 4:
+                m = _KV_RE.match(stripped.strip())
+                if m:
+                    current_item[m.group(1)] = _parse_scalar(m.group(2))
+                continue
 
-        # Flush pending list item
-        if current_item is not None and current_list_key is not None:
-            result.setdefault(current_list_key, []).append(current_item)
+            # Nested dict value (not a list)
+            if not current_block_is_list:
+                m = _KV_RE.match(stripped.strip())
+                if m:
+                    if not isinstance(result.get(current_block_key), dict):
+                        result[current_block_key] = {}
+                    result[current_block_key][m.group(1)] = _parse_scalar(m.group(2))
+                continue
+
+        # Flush pending list item before processing top-level key
+        if current_item is not None and current_block_key is not None:
+            result.setdefault(current_block_key, []).append(current_item)
             current_item = None
 
         if indent == 0:
+            current_block_is_list = False
             m = _KV_RE.match(stripped)
             if m:
                 key, val = m.group(1), m.group(2).strip()
-                if val == "" or val == "[]":
-                    current_list_key = key
-                    result[key] = []
-                else:
-                    current_list_key = None
-                    result[key] = _parse_scalar(val)
+                current_block_key = None
+                result[key] = _parse_scalar(val)
             elif stripped.endswith(":"):
-                current_list_key = stripped[:-1].strip()
-                result.setdefault(current_list_key, [])
+                current_block_key = stripped[:-1].strip()
+                current_item = None
 
-    if current_item is not None and current_list_key is not None:
-        result.setdefault(current_list_key, []).append(current_item)
+    if current_item is not None and current_block_key is not None:
+        result.setdefault(current_block_key, []).append(current_item)
 
     return result
 

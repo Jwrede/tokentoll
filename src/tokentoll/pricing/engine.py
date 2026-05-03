@@ -19,6 +19,14 @@ _ERROR_AGE_DAYS = 30
 _DEFAULT_INPUT_TOKENS = 500
 _DEFAULT_OUTPUT_RATIO = 0.25
 
+_SDK_DEFAULT_MODELS: dict[str, str] = {
+    "openai": "gpt-4o",
+    "anthropic": "claude-sonnet-4-20250514",
+    "google_genai": "gemini-2.0-flash",
+    "litellm": "gpt-4o",
+    "langchain": "gpt-4o",
+}
+
 _DATE_SUFFIX_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 _DATE_SUFFIX_LONG_RE = re.compile(r"-\d{8}$")
 
@@ -160,29 +168,42 @@ class PricingEngine:
         call: LLMCall,
         calls_per_month: int = 1000,
         default_model: str | None = None,
+        default_models: dict[str, str] | None = None,
     ) -> CostEstimate:
         notes: list[str] = []
 
         if not call.model:
-            if default_model:
-                pricing = self.lookup(default_model, sdk=call.sdk)
+            resolved_default = None
+            source = ""
+            if default_models and call.sdk in default_models:
+                resolved_default = default_models[call.sdk]
+                source = "config"
+            elif default_model:
+                resolved_default = default_model
+                source = "config"
+            elif call.sdk in _SDK_DEFAULT_MODELS:
+                resolved_default = _SDK_DEFAULT_MODELS[call.sdk]
+                source = "built-in"
+
+            if resolved_default:
+                pricing = self.lookup(resolved_default, sdk=call.sdk)
                 if pricing is None:
                     return CostEstimate(
                         call=call,
                         pricing=None,
                         model_found=False,
                         notes=[
-                            f"Model is dynamic -- default '{default_model}' "
+                            f"Model is dynamic, default '{resolved_default}' "
                             "not found in pricing data"
                         ],
                     )
-                notes.append(f"Model is dynamic -- using default '{default_model}' from config")
-                return self._compute(call, pricing, notes, calls_per_month, default_model)
+                notes.append(f"Model is dynamic, using {source} default '{resolved_default}'")
+                return self._compute(call, pricing, notes, calls_per_month, resolved_default)
             return CostEstimate(
                 call=call,
                 pricing=None,
                 model_found=False,
-                notes=["Model is dynamic -- cannot estimate cost"],
+                notes=["Model is dynamic, cannot estimate cost"],
             )
 
         pricing = self.lookup(call.model, sdk=call.sdk)
