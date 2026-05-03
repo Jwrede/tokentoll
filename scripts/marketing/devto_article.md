@@ -122,16 +122,37 @@ client = OpenAI()  # tokentoll remembers this
 client.chat.completions.create(...)  # matched via tracked variable
 ```
 
-Model names are resolved through a tiered lookup: exact match, case-insensitive,
-provider prefix stripping (`openai/gpt-4o` -> `gpt-4o`), region prefix stripping
-(`us.anthropic.X` -> `anthropic.X`), and date suffix stripping
-(`gpt-4o-2024-08-06` -> `gpt-4o`).
+### Multi-pass constant propagation
+
+Real codebases rarely pass string literals directly. Model names flow through
+variables, class attributes, config objects, and `**kwargs`. tokentoll uses a
+multi-pass constant propagation engine that iterates to a fixed point:
+
+```python
+DEFAULT_MODEL = "gpt-4o"
+
+class Config:
+    model: str = DEFAULT_MODEL
+
+config = Config()
+kwargs = {"model": config.model, "max_tokens": 2000}
+client.chat.completions.create(**kwargs)  # resolved: model="gpt-4o", max_tokens=2000
+```
+
+It follows: variable assignments, `os.getenv()` fallbacks, function defaults,
+class attribute defaults, constructor argument propagation (`obj = Cls(val)` ->
+`self.attr`), dict contents, and `**kwargs` unpacking.
+
+Model names are then resolved through a tiered pricing lookup: exact match,
+case-insensitive, provider prefix stripping (`openai/gpt-4o` -> `gpt-4o`),
+region prefix stripping (`us.anthropic.X` -> `anthropic.X`), and date suffix
+stripping (`gpt-4o-2024-08-06` -> `gpt-4o`).
 
 ## What it does NOT do
 
 tokentoll is static analysis. It cannot:
 
-- Estimate costs for dynamic model names (`model=get_model()`)
+- Resolve models loaded from external config files or databases at runtime
 - Count tokens in computed prompts or template variables
 - Predict actual call volume (it assumes a configurable calls-per-month)
 

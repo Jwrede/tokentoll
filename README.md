@@ -149,7 +149,9 @@ Monthly cost impact: +$0.30
 ```
 
 1. Parses Python files using the `ast` module to find LLM API calls
-2. Extracts model name, max_tokens, and prompt content where possible
+2. Multi-pass constant propagation resolves model names through variables,
+   `os.getenv()` fallbacks, class attributes, constructor args, dict contents,
+   and `**kwargs` unpacking
 3. Looks up pricing from a local cache (sourced from LiteLLM, 2200+ models)
 4. For diff mode: compares calls between two git refs and computes the cost delta
 5. Outputs a cost report as a table, JSON, or GitHub PR comment
@@ -174,10 +176,35 @@ Pricing data is sourced from LiteLLM's `model_prices_and_context_window.json`
 and covers 300+ models across OpenAI, Anthropic, Google, AWS Bedrock,
 Azure, and more.
 
+## Smart Variable Resolution
+
+Real codebases rarely pass model names as string literals. tokentoll's multi-pass
+constant propagation engine follows:
+
+```python
+DEFAULT_MODEL = os.getenv("MODEL", "gpt-4o")
+
+class Config:
+    model: str = DEFAULT_MODEL
+
+config = Config()
+kwargs = {"model": config.model, "max_tokens": 2000}
+client.chat.completions.create(**kwargs)
+# tokentoll resolves: model="gpt-4o", max_tokens=2000
+```
+
+- Variable assignments (`MODEL = "gpt-4o"`)
+- `os.getenv()` / `os.environ.get()` fallback values
+- Function default parameters
+- Class attribute defaults
+- Constructor argument propagation
+- Dict literal and subscript contents
+- `**kwargs` unpacking
+
 ## Limitations
 
-- Static analysis only -- cannot estimate costs for dynamic model names
-  or computed prompts (these are flagged but not priced)
+- Cannot resolve models loaded from external config files or databases at runtime
+  (these are flagged as dynamic but not priced)
 - Token estimates use a character/4 heuristic unless tiktoken is installed
 - Monthly estimates assume uniform call volume (configurable via `--calls-per-month`)
 - Python only for now (JS/TS support planned)

@@ -20,9 +20,10 @@ github.com/Jwrede/tokentoll
 How it works:
 
 1. Parses your Python with ast module
-2. Detects OpenAI, Anthropic, Google, LiteLLM, LangChain calls
-3. Looks up real pricing (auto-cached from LiteLLM)
-4. Shows you the cost delta
+2. Multi-pass constant propagation resolves model names through variables, **kwargs, class attrs
+3. Detects OpenAI, Anthropic, Google, LiteLLM, LangChain calls
+4. Looks up real pricing (2200+ models, auto-cached)
+5. Shows you the cost delta
 
 [ATTACH: terminal screenshot of tokentoll diff output]
 

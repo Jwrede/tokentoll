@@ -18,10 +18,12 @@ you the cost impact of every change.
     tokentoll diff HEAD~1     # show cost impact of last commit
 
 It uses Python's ast module to detect calls to OpenAI, Anthropic, Google GenAI,
-LiteLLM, and LangChain SDKs. Pricing data is sourced from LiteLLM's pricing
-database (2200+ models) and cached locally.
+LiteLLM, and LangChain SDKs. A multi-pass constant propagation engine follows
+variable assignments, class attributes, **kwargs, os.getenv() fallbacks, and
+constructor arguments to resolve model names that aren't string literals.
 
-Zero runtime dependencies. Works offline with bundled pricing data.
+Pricing data is sourced from LiteLLM's database (2200+ models). Zero runtime
+dependencies. Works offline with bundled pricing data.
 
 Think Infracost, but for LLM API spend instead of cloud infrastructure.
 

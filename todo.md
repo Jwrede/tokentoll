@@ -42,7 +42,7 @@
 - [x] CI workflow (.github/workflows/ci.yml)
 - [x] Pricing updater command (fetch latest from LiteLLM)
 - [x] Tests: detectors, pricing, diff, integration (38 tests, all passing)
-- [ ] PyPI publish (need PyPI API token -- run: twine upload dist/*)
+- [x] PyPI publish v0.1.0 (twine upload dist/*)
 - [x] GitHub release v0.1.0
 - [x] GitHub topics: llm, openai, anthropic, cost-optimization, github-action, devtools, mlops
 
@@ -64,11 +64,25 @@
 - [x] Write all marketing copy (8 files in scripts/marketing/)
 - [x] Demo recording (asciinema: https://asciinema.org/a/H1bhVFIiPqUE0Shh)
 
+## Day 2.5: Deep Variable Resolution
+
+- [x] Multi-pass constant propagation engine (5 propagation passes to fixed point)
+- [x] Variable-to-variable resolution (x = y where y is known)
+- [x] os.getenv() / os.environ.get() fallback extraction
+- [x] Function default argument tracking
+- [x] Class attribute defaults and self.x = y in __init__
+- [x] Constructor argument propagation (obj = Cls(val) -> obj.attr)
+- [x] Dict literal/subscript contents (d["key"] = val)
+- [x] **kwargs unpacking resolution (create(**d) resolves d.model)
+- [x] Instance attribute inheritance from class-level defaults
+- [x] All detectors updated for kwargs resolution
+- [x] 9 new tests (47 total, all passing)
+- [x] PyPI publish v0.2.0
+- [x] GitHub release v0.2.0
+
 ## Day 3: Launch Day (all at once for max trending signal)
 
 ### Morning (~9am ET, Tue/Wed for peak traffic)
-
-- [ ] PyPI publish (need API token first)
 - [ ] Submit Show HN (manual paste from hn_post.md)
 - [ ] Post X/Twitter launch thread
 - [ ] Post to LinkedIn
