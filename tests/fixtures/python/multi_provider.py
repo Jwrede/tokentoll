@@ -1,6 +1,6 @@
-from openai import OpenAI
-from anthropic import Anthropic
 import litellm
+from anthropic import Anthropic
+from openai import OpenAI
 
 openai_client = OpenAI()
 anthropic_client = Anthropic()

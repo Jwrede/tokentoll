@@ -17,11 +17,15 @@ def main(argv: list[str] | None = None) -> int:
     scan_parser = subparsers.add_parser("scan", help="Scan files for LLM API calls and costs")
     scan_parser.add_argument("paths", nargs="*", default=["."], help="Paths to scan")
     scan_parser.add_argument(
-        "--format", choices=["table", "json", "markdown"], default="table",
+        "--format",
+        choices=["table", "json", "markdown"],
+        default="table",
         help="Output format (default: table)",
     )
     scan_parser.add_argument(
-        "--calls-per-month", type=int, default=1000,
+        "--calls-per-month",
+        type=int,
+        default=1000,
         help="Assumed monthly call volume per call site (default: 1000)",
     )
 
@@ -37,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Output format (default: table)",
     )
     diff_parser.add_argument(
-        "--calls-per-month", type=int, default=1000,
+        "--calls-per-month",
+        type=int,
+        default=1000,
         help="Assumed monthly call volume per call site (default: 1000)",
     )
 
@@ -52,10 +58,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "scan":
         from tokentoll.core.pipeline import run_scan
+
         return run_scan(args.paths, args.format, args.calls_per_month)
 
     if args.command == "diff":
         from tokentoll.core.pipeline import run_diff_command
+
         return run_diff_command(
             ref=args.ref,
             base=args.base,
@@ -66,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "update":
         from tokentoll.pricing.updater import update_bundled_pricing
+
         update_bundled_pricing()
         return 0
 

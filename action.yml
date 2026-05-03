@@ -1,0 +1,73 @@
+name: "tokentoll"
+description: "Catch LLM cost changes in code review. Infracost for LLM spend."
+branding:
+  icon: "dollar-sign"
+  color: "orange"
+
+inputs:
+  github-token:
+    description: "GitHub token for posting PR comments"
+    required: false
+    default: ${{ github.token }}
+  calls-per-month:
+    description: "Assumed monthly call volume per call site"
+    required: false
+    default: "1000"
+  base-ref:
+    description: "Base git ref for comparison (default: PR base)"
+    required: false
+  head-ref:
+    description: "Head git ref for comparison (default: PR head)"
+    required: false
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.11"
+
+outputs:
+  monthly-delta:
+    description: "Net monthly cost delta (positive = more expensive)"
+    value: ${{ steps.run.outputs.monthly-delta }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install tokentoll
+      shell: bash
+      run: pip install tokentoll
+
+    - name: Run analysis
+      id: run
+      shell: bash
+      env:
+        INPUT_CALLS_PER_MONTH: ${{ inputs.calls-per-month }}
+        INPUT_BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
+        INPUT_HEAD_REF: ${{ inputs.head-ref || github.event.pull_request.head.sha }}
+      run: |
+        COMMENT=$(tokentoll diff \
+          --base="${INPUT_BASE_REF}" \
+          --head="${INPUT_HEAD_REF}" \
+          --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+          --format=github-comment 2>&1) || true
+
+        DELTA=$(tokentoll diff \
+          --base="${INPUT_BASE_REF}" \
+          --head="${INPUT_HEAD_REF}" \
+          --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+          --format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_monthly_delta', 0))") || true
+
+        echo "monthly-delta=${DELTA}" >> "$GITHUB_OUTPUT"
+        echo "${COMMENT}" > /tmp/tokentoll-comment.md
+
+    - name: Post PR comment
+      if: github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        header: tokentoll
+        path: /tmp/tokentoll-comment.md

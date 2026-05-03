@@ -1,0 +1,46 @@
+name: Update Pricing Data
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+
+      - name: Update pricing data
+        run: |
+          python -c "
+          from tokentoll.pricing.updater import update_bundled_pricing
+          import json, shutil
+          from pathlib import Path
+          update_bundled_pricing()
+          src = Path.home() / '.tokentoll' / 'model_prices.json'
+          dst = Path('src/tokentoll/pricing/data/model_prices.json')
+          shutil.copy(src, dst)
+          "
+
+      - name: Create PR if changed
+        run: |
+          git diff --quiet src/tokentoll/pricing/data/model_prices.json && exit 0
+          BRANCH="auto/update-pricing-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add src/tokentoll/pricing/data/model_prices.json
+          git commit -m "Update bundled pricing data"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "Update bundled pricing data" \
+            --body "Automated weekly update of LiteLLM pricing data." \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
