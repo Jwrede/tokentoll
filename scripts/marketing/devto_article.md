@@ -127,22 +127,6 @@ provider prefix stripping (`openai/gpt-4o` -> `gpt-4o`), region prefix stripping
 (`us.anthropic.X` -> `anthropic.X`), and date suffix stripping
 (`gpt-4o-2024-08-06` -> `gpt-4o`).
 
-## Validated against real codebases
-
-Before calling it done, I ran tokentoll against popular open-source LLM projects:
-
-| Project | LLM Calls Found | Est. Monthly Cost |
-|---------|----------------|-------------------|
-| LiteLLM | 1,387 | $22,858 |
-| LangChain | 429 | $32,186 |
-| instructor | 10 | $252 |
-| crewAI | 3 | $2 |
-
-**1,834 total calls detected. Zero crashes.** The high monthly estimates assume
-1,000 calls/month per call site -- the point is not the absolute number but
-the relative cost of different models. A single o1 call site costs 100x more
-than a gpt-4o-mini call site.
-
 ## What it does NOT do
 
 tokentoll is static analysis. It cannot:

@@ -21,10 +21,6 @@ It uses Python's ast module to detect calls to OpenAI, Anthropic, Google GenAI,
 LiteLLM, and LangChain SDKs. Pricing data is sourced from LiteLLM's pricing
 database (2200+ models) and cached locally.
 
-I validated it against real codebases: LiteLLM (1,387 calls detected,
-~$22.9k/mo estimated), LangChain (429 calls, ~$32.2k/mo), instructor (10
-calls), and crewAI (3 calls). 1,834 total calls, zero crashes.
-
 Zero runtime dependencies. Works offline with bundled pricing data.
 
 Think Infracost, but for LLM API spend instead of cloud infrastructure.

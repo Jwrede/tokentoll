@@ -31,7 +31,4 @@ Same concept as Infracost for Terraform, but for LLM API spend.
 - Zero runtime dependencies
 - MIT licensed
 
-Tested against real codebases: found 1,387 calls in LiteLLM, 429 in LangChain,
-1,834 total across 5 repos with zero crashes.
-
 GitHub: https://github.com/Jwrede/tokentoll

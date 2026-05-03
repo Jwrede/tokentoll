@@ -36,17 +36,7 @@ Model swap? New API call? Removed endpoint? You see the dollar impact before mer
 
 [ATTACH: screenshot of PR comment]
 
-## Tweet 4 (validation)
-
-I tested it against real codebases:
-
-- LiteLLM: 1,387 LLM calls found
-- LangChain: 429 calls
-- instructor, crewAI, promptfoo
-
-1,834 total calls. Zero crashes.
-
-## Tweet 5 (CTA)
+## Tweet 4 (CTA)
 
 If you're building with LLM APIs, give it a try:
 
