@@ -6,7 +6,7 @@ openai_client = OpenAI()
 anthropic_client = Anthropic()
 
 r1 = openai_client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4o-mini",
     max_tokens=2000,
     messages=[{"role": "user", "content": "Hello"}],
 )
