@@ -1,15 +1,9 @@
-import ast
-
 from tokentoll.core.models import CallType
-from tokentoll.detectors.openai_detector import OpenAIDetector
+from tokentoll.scanner.python_scanner import scan_source
 
 
 def _detect(source: str) -> list:
-    tree = ast.parse(source)
-    d = OpenAIDetector()
-    if not d.can_handle(tree, source):
-        return []
-    return d.detect(tree, "test.py")
+    return scan_source(source, "test.py")
 
 
 def test_chat_completion_basic():
@@ -60,7 +54,7 @@ client.embeddings.create(model="text-embedding-3-small", input="hello")
     assert calls[0].call_type == CallType.EMBEDDING
 
 
-def test_variable_model():
+def test_dynamic_model():
     source = """
 from openai import OpenAI
 client = OpenAI()
@@ -71,6 +65,71 @@ client.chat.completions.create(model=model, messages=[])
     assert len(calls) == 1
     assert calls[0].model is None
     assert calls[0].model_is_literal is False
+
+
+def test_variable_model_resolution():
+    source = """
+from openai import OpenAI
+client = OpenAI()
+MODEL = "gpt-4o"
+client.chat.completions.create(model=MODEL, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+    assert calls[0].model_is_literal is False
+
+
+def test_variable_max_tokens_resolution():
+    source = """
+from openai import OpenAI
+client = OpenAI()
+MAX_TOKENS = 2000
+client.chat.completions.create(model="gpt-4o", max_tokens=MAX_TOKENS, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].max_tokens == 2000
+
+
+def test_os_getenv_fallback():
+    source = """
+import os
+from openai import OpenAI
+client = OpenAI()
+model = os.getenv("MODEL", "gpt-4o-mini")
+client.chat.completions.create(model=model, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o-mini"
+    assert calls[0].model_is_literal is False
+
+
+def test_os_environ_get_fallback():
+    source = """
+import os
+from openai import OpenAI
+client = OpenAI()
+model = os.environ.get("OPENAI_MODEL", "gpt-4o")
+client.chat.completions.create(model=model, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
+def test_function_default_model():
+    source = """
+from openai import OpenAI
+client = OpenAI()
+def call_llm(model="gpt-4o", max_tokens=1000):
+    return client.chat.completions.create(model=model, max_tokens=max_tokens, messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+    assert calls[0].max_tokens == 1000
 
 
 def test_module_level_import():
@@ -88,9 +147,8 @@ def test_no_openai_import():
 import requests
 requests.get("https://example.com")
 """
-    tree = ast.parse(source)
-    d = OpenAIDetector()
-    assert not d.can_handle(tree, source)
+    calls = _detect(source)
+    assert len(calls) == 0
 
 
 def test_multiple_calls():

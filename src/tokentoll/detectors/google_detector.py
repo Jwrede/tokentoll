@@ -12,6 +12,7 @@ from tokentoll.scanner.python_scanner import (
     find_imports,
     get_attribute_chain,
     get_keyword_value,
+    resolve_string,
 )
 
 _CALL_PATTERNS: list[tuple[list[str], CallType]] = [
@@ -27,7 +28,13 @@ class GoogleDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         return bool(find_imports(tree, "google.genai") or find_imports(tree, "google"))
 
-    def detect(self, tree: ast.Module, file_path: str) -> list[LLMCall]:
+    def detect(
+        self,
+        tree: ast.Module,
+        file_path: str,
+        variables: dict[str, str | int] | None = None,
+    ) -> list[LLMCall]:
+        variables = variables or {}
         genai_names = find_imports(tree, "google.genai")
         google_names = find_imports(tree, "google")
 
@@ -64,7 +71,7 @@ class GoogleDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = extract_string_literal(model_node) if model_node else None
+            model = resolve_string(model_node, variables)
 
             max_tokens = _extract_max_output_tokens(node)
 
@@ -82,7 +89,9 @@ class GoogleDetector(BaseDetector):
                     sdk="google_genai",
                     call_type=call_type,
                     model=model,
-                    model_is_literal=model is not None,
+                    model_is_literal=(
+                        model_node is not None and extract_string_literal(model_node) is not None
+                    ),
                     max_tokens=max_tokens,
                     estimated_input_tokens=est_input,
                     estimated_output_tokens=max_tokens,

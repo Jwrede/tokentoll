@@ -14,10 +14,12 @@ def scan_source(source: str, file_path: str) -> list[LLMCall]:
     except SyntaxError:
         return []
 
+    variables = build_variable_map(tree)
+
     calls: list[LLMCall] = []
     for detector in get_all_detectors():
         if detector.can_handle(tree, source):
-            calls.extend(detector.detect(tree, file_path))
+            calls.extend(detector.detect(tree, file_path, variables))
     return calls
 
 
@@ -148,3 +150,107 @@ def find_assigned_names(tree: ast.Module, class_names: set[str]) -> set[str]:
                 if func_name in class_names:
                     result.add(target.id)
     return result
+
+
+def build_variable_map(tree: ast.Module) -> dict[str, str | int]:
+    """Build a map of variable names to their constant values.
+
+    Tracks simple assignments like:
+        MODEL = "gpt-4o"
+        MAX_TOKENS = 1000
+        model = os.getenv("MODEL", "gpt-4o")  -> extracts fallback "gpt-4o"
+        model = os.environ.get("MODEL", "gpt-4o")  -> extracts fallback "gpt-4o"
+
+    Also tracks function default arguments:
+        def call_llm(model="gpt-4o", ...):  -> model = "gpt-4o"
+
+    Later assignments overwrite earlier ones (last-write wins).
+    """
+    variables: dict[str, str | int] = {}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name):
+                val = _extract_constant_value(node.value)
+                if val is not None:
+                    variables[target.id] = val
+
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defaults = node.args.defaults
+            args = node.args.args
+            if defaults:
+                offset = len(args) - len(defaults)
+                for i, default in enumerate(defaults):
+                    arg_name = args[offset + i].arg
+                    val = _extract_constant_value(default)
+                    if val is not None:
+                        variables[arg_name] = val
+
+            for kw_default in node.args.kw_defaults:
+                if kw_default is not None:
+                    val = _extract_constant_value(kw_default)
+                    if val is not None:
+                        pass
+
+            for kwarg, default in zip(node.args.kwonlyargs, node.args.kw_defaults):
+                if default is not None:
+                    val = _extract_constant_value(default)
+                    if val is not None:
+                        variables[kwarg.arg] = val
+
+    return variables
+
+
+def _extract_constant_value(node: ast.expr) -> str | int | None:
+    """Extract a constant value from an AST expression.
+
+    Handles:
+    - String/int literals: "gpt-4o", 1000
+    - os.getenv("KEY", "default") -> extracts "default"
+    - os.environ.get("KEY", "default") -> extracts "default"
+    """
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, (str, int)):
+            return node.value
+        return None
+
+    if isinstance(node, ast.Call):
+        chain = get_attribute_chain(node.func)
+        chain_str = ".".join(chain)
+        if chain_str in ("os.getenv", "os.environ.get"):
+            if len(node.args) >= 2:
+                return _extract_constant_value(node.args[1])
+            default_kw = get_keyword_value(node, "default")
+            if default_kw:
+                return _extract_constant_value(default_kw)
+
+    return None
+
+
+def resolve_string(node: ast.expr | None, variables: dict[str, str | int]) -> str | None:
+    """Resolve a string value from an AST node, falling back to variable lookup."""
+    if node is None:
+        return None
+    lit = extract_string_literal(node)
+    if lit is not None:
+        return lit
+    if isinstance(node, ast.Name) and node.id in variables:
+        val = variables[node.id]
+        if isinstance(val, str):
+            return val
+    return None
+
+
+def resolve_int(node: ast.expr | None, variables: dict[str, str | int]) -> int | None:
+    """Resolve an integer value from an AST node, falling back to variable lookup."""
+    if node is None:
+        return None
+    lit = extract_int_literal(node)
+    if lit is not None:
+        return lit
+    if isinstance(node, ast.Name) and node.id in variables:
+        val = variables[node.id]
+        if isinstance(val, int):
+            return val
+    return None

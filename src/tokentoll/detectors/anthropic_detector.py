@@ -7,12 +7,13 @@ from tokentoll.detectors.base import BaseDetector
 from tokentoll.scanner.python_scanner import (
     chain_ends_with,
     estimate_tokens_from_messages,
-    extract_int_literal,
     extract_string_literal,
     find_assigned_names,
     find_imports,
     get_attribute_chain,
     get_keyword_value,
+    resolve_int,
+    resolve_string,
 )
 
 _CLIENT_CLASSES = {"Anthropic", "AsyncAnthropic"}
@@ -30,7 +31,13 @@ class AnthropicDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         return bool(find_imports(tree, "anthropic"))
 
-    def detect(self, tree: ast.Module, file_path: str) -> list[LLMCall]:
+    def detect(
+        self,
+        tree: ast.Module,
+        file_path: str,
+        variables: dict[str, str | int] | None = None,
+    ) -> list[LLMCall]:
+        variables = variables or {}
         imported_names = find_imports(tree, "anthropic")
         client_vars = find_assigned_names(tree, _CLIENT_CLASSES)
 
@@ -61,10 +68,10 @@ class AnthropicDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = extract_string_literal(model_node) if model_node else None
+            model = resolve_string(model_node, variables)
 
             max_tokens_node = get_keyword_value(node, "max_tokens")
-            max_tokens = extract_int_literal(max_tokens_node) if max_tokens_node else None
+            max_tokens = resolve_int(max_tokens_node, variables)
 
             est_input = None
             messages_node = get_keyword_value(node, "messages")
@@ -85,7 +92,9 @@ class AnthropicDetector(BaseDetector):
                     sdk="anthropic",
                     call_type=call_type,
                     model=model,
-                    model_is_literal=model is not None,
+                    model_is_literal=(
+                        model_node is not None and extract_string_literal(model_node) is not None
+                    ),
                     max_tokens=max_tokens,
                     estimated_input_tokens=est_input,
                     estimated_output_tokens=max_tokens,

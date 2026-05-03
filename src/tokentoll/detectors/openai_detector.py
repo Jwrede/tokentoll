@@ -8,12 +8,13 @@ from tokentoll.scanner.python_scanner import (
     chain_ends_with,
     estimate_tokens_from_messages,
     estimate_tokens_from_string,
-    extract_int_literal,
     extract_string_literal,
     find_assigned_names,
     find_imports,
     get_attribute_chain,
     get_keyword_value,
+    resolve_int,
+    resolve_string,
 )
 
 _CLIENT_CLASSES = {"OpenAI", "AsyncOpenAI"}
@@ -33,7 +34,13 @@ class OpenAIDetector(BaseDetector):
     def can_handle(self, tree: ast.Module, source: str) -> bool:
         return bool(find_imports(tree, "openai"))
 
-    def detect(self, tree: ast.Module, file_path: str) -> list[LLMCall]:
+    def detect(
+        self,
+        tree: ast.Module,
+        file_path: str,
+        variables: dict[str, str | int] | None = None,
+    ) -> list[LLMCall]:
+        variables = variables or {}
         imported_names = find_imports(tree, "openai")
         client_vars = find_assigned_names(tree, _CLIENT_CLASSES)
 
@@ -64,11 +71,13 @@ class OpenAIDetector(BaseDetector):
                 continue
 
             model_node = get_keyword_value(node, "model")
-            model = extract_string_literal(model_node) if model_node else None
-            model_is_literal = model is not None
+            model = resolve_string(model_node, variables)
+            model_is_literal = (
+                model_node is not None and extract_string_literal(model_node) is not None
+            )
 
             max_tokens_node = get_keyword_value(node, "max_tokens")
-            max_tokens = extract_int_literal(max_tokens_node) if max_tokens_node else None
+            max_tokens = resolve_int(max_tokens_node, variables)
 
             est_input = None
             est_output = max_tokens

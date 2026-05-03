@@ -18,6 +18,11 @@ class BaseDetector(ABC):
         ...
 
     @abstractmethod
-    def detect(self, tree: ast.Module, file_path: str) -> list[LLMCall]:
+    def detect(
+        self,
+        tree: ast.Module,
+        file_path: str,
+        variables: dict[str, str | int] | None = None,
+    ) -> list[LLMCall]:
         """Walk the AST and return all detected LLM API calls."""
         ...

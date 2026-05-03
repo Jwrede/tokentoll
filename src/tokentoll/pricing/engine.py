@@ -158,7 +158,7 @@ class PricingEngine:
     def estimate(self, call: LLMCall, calls_per_month: int = 1000) -> CostEstimate:
         notes: list[str] = []
 
-        if not call.model or not call.model_is_literal:
+        if not call.model:
             return CostEstimate(
                 call=call,
                 pricing=None,

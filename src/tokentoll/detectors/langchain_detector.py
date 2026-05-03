@@ -5,10 +5,11 @@ import ast
 from tokentoll.core.models import CallType, LLMCall
 from tokentoll.detectors.base import BaseDetector
 from tokentoll.scanner.python_scanner import (
-    extract_int_literal,
     extract_string_literal,
     find_imports,
     get_keyword_value,
+    resolve_int,
+    resolve_string,
 )
 
 _LANGCHAIN_PACKAGES = [
@@ -42,7 +43,13 @@ class LangChainDetector(BaseDetector):
                 return True
         return False
 
-    def detect(self, tree: ast.Module, file_path: str) -> list[LLMCall]:
+    def detect(
+        self,
+        tree: ast.Module,
+        file_path: str,
+        variables: dict[str, str | int] | None = None,
+    ) -> list[LLMCall]:
+        variables = variables or {}
         imported_classes: set[str] = set()
         imported_functions: set[str] = set()
 
@@ -77,12 +84,12 @@ class LangChainDetector(BaseDetector):
             model_node = get_keyword_value(node, "model") or get_keyword_value(node, "model_name")
             if model_node is None and node.args:
                 model_node = node.args[0]
-            model = extract_string_literal(model_node) if model_node else None
+            model = resolve_string(model_node, variables)
 
             max_tokens_node = get_keyword_value(node, "max_tokens") or get_keyword_value(
                 node, "max_output_tokens"
             )
-            max_tokens = extract_int_literal(max_tokens_node) if max_tokens_node else None
+            max_tokens = resolve_int(max_tokens_node, variables)
 
             calls.append(
                 LLMCall(
@@ -91,7 +98,9 @@ class LangChainDetector(BaseDetector):
                     sdk="langchain",
                     call_type=CallType.CHAT_COMPLETION,
                     model=model,
-                    model_is_literal=model is not None,
+                    model_is_literal=(
+                        model_node is not None and extract_string_literal(model_node) is not None
+                    ),
                     max_tokens=max_tokens,
                     estimated_input_tokens=None,
                     estimated_output_tokens=max_tokens,
