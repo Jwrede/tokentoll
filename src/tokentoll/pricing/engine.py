@@ -155,10 +155,29 @@ class PricingEngine:
 
         return None
 
-    def estimate(self, call: LLMCall, calls_per_month: int = 1000) -> CostEstimate:
+    def estimate(
+        self,
+        call: LLMCall,
+        calls_per_month: int = 1000,
+        default_model: str | None = None,
+    ) -> CostEstimate:
         notes: list[str] = []
 
         if not call.model:
+            if default_model:
+                pricing = self.lookup(default_model, sdk=call.sdk)
+                if pricing is None:
+                    return CostEstimate(
+                        call=call,
+                        pricing=None,
+                        model_found=False,
+                        notes=[
+                            f"Model is dynamic -- default '{default_model}' "
+                            "not found in pricing data"
+                        ],
+                    )
+                notes.append(f"Model is dynamic -- using default '{default_model}' from config")
+                return self._compute(call, pricing, notes, calls_per_month, default_model)
             return CostEstimate(
                 call=call,
                 pricing=None,
@@ -179,6 +198,16 @@ class PricingEngine:
                 notes=[f"Unknown model '{call.model}'"],
             )
 
+        return self._compute(call, pricing, notes, calls_per_month)
+
+    def _compute(
+        self,
+        call: LLMCall,
+        pricing: ModelPricing,
+        notes: list[str],
+        calls_per_month: int,
+        used_default: str | None = None,
+    ) -> CostEstimate:
         input_tokens = call.estimated_input_tokens
         if input_tokens is None:
             input_tokens = _DEFAULT_INPUT_TOKENS
@@ -203,5 +232,6 @@ class PricingEngine:
             estimated_cost_per_call=cost_per_call,
             monthly_estimate=monthly,
             model_found=True,
+            used_default_model=used_default,
             notes=notes,
         )

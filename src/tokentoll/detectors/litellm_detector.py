@@ -89,7 +89,7 @@ class LiteLLMDetector(BaseDetector):
             est_input = None
             messages_node = get_keyword_value(node, "messages")
             if messages_node:
-                est_input = estimate_tokens_from_messages(messages_node)
+                est_input = estimate_tokens_from_messages(messages_node, model)
 
             calls.append(
                 LLMCall(

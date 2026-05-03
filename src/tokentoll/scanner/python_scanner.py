@@ -125,25 +125,29 @@ def resolve_kwargs_value(
     return None
 
 
-def estimate_tokens_from_string(s: str) -> int:
-    """Rough token estimate: ~4 characters per token for English text."""
-    return max(1, len(s) // 4)
+def estimate_tokens_from_string(s: str, model: str | None = None) -> int:
+    """Estimate token count. Uses tiktoken if installed, else char/4 heuristic."""
+    from tokentoll.tokenizer import estimate_tokens
+
+    return estimate_tokens(s, model)
 
 
-def estimate_tokens_from_messages(node: ast.expr) -> int | None:
+def estimate_tokens_from_messages(node: ast.expr, model: str | None = None) -> int | None:
     """Estimate input tokens from a messages list literal."""
+    from tokentoll.tokenizer import estimate_tokens
+
     if not isinstance(node, ast.List):
         return None
-    total_chars = 0
+    parts: list[str] = []
     for elt in node.elts:
         if isinstance(elt, ast.Dict):
             for v in elt.values:
                 s = extract_string_literal(v) if v else None
                 if s:
-                    total_chars += len(s)
-    if total_chars == 0:
+                    parts.append(s)
+    if not parts:
         return None
-    return max(1, total_chars // 4)
+    return estimate_tokens(" ".join(parts), model)
 
 
 def find_imports(tree: ast.Module, package: str) -> list[str]:

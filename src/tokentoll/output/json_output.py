@@ -15,6 +15,7 @@ def _estimate_to_dict(est: CostEstimate) -> dict:
         "estimated_input_tokens": est.call.estimated_input_tokens,
         "estimated_output_tokens": est.call.estimated_output_tokens,
         "model_found": est.model_found,
+        "used_default_model": est.used_default_model,
         "estimated_cost_per_call": est.estimated_cost_per_call,
         "monthly_estimate": est.monthly_estimate,
         "notes": est.notes,

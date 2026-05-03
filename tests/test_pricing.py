@@ -76,3 +76,47 @@ def test_estimate_anthropic_model():
     est = engine.estimate(call, calls_per_month=500)
     assert est.model_found is True
     assert est.monthly_estimate is not None
+
+
+def test_estimate_dynamic_with_default_model():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="openai",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(call, default_model="gpt-4o")
+    assert est.model_found is True
+    assert est.used_default_model == "gpt-4o"
+    assert est.estimated_cost_per_call is not None
+    assert est.estimated_cost_per_call > 0
+    assert any("default" in n.lower() for n in est.notes)
+
+
+def test_estimate_dynamic_with_bad_default_model():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="openai",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(call, default_model="nonexistent-model-xyz")
+    assert est.model_found is False
+    assert "not found" in est.notes[0].lower()
+
+
+def test_estimate_resolved_model_ignores_default():
+    """When model IS resolved, default_model should be ignored."""
+    call = _make_call("gpt-4o")
+    engine = PricingEngine()
+    est = engine.estimate(call, default_model="gpt-4o-mini")
+    assert est.used_default_model is None
+    assert est.model_found is True

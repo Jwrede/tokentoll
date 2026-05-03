@@ -80,13 +80,13 @@ class OpenAIDetector(BaseDetector):
             if call_type == CallType.CHAT_COMPLETION:
                 messages_node = get_keyword_value(node, "messages")
                 if messages_node:
-                    est_input = estimate_tokens_from_messages(messages_node)
+                    est_input = estimate_tokens_from_messages(messages_node, model)
             elif call_type == CallType.RESPONSES:
                 input_node = get_keyword_value(node, "input")
                 if input_node:
                     s = extract_string_literal(input_node)
                     if s:
-                        est_input = estimate_tokens_from_string(s)
+                        est_input = estimate_tokens_from_string(s, model)
 
             calls.append(
                 LLMCall(

@@ -25,8 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     scan_parser.add_argument(
         "--calls-per-month",
         type=int,
-        default=1000,
+        default=None,
         help="Assumed monthly call volume per call site (default: 1000)",
+    )
+    scan_parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to .tokentoll.yml config file",
     )
 
     # diff command
@@ -43,8 +48,13 @@ def main(argv: list[str] | None = None) -> int:
     diff_parser.add_argument(
         "--calls-per-month",
         type=int,
-        default=1000,
+        default=None,
         help="Assumed monthly call volume per call site (default: 1000)",
+    )
+    diff_parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to .tokentoll.yml config file",
     )
 
     # update command
@@ -59,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "scan":
         from tokentoll.core.pipeline import run_scan
 
-        return run_scan(args.paths, args.format, args.calls_per_month)
+        return run_scan(args.paths, args.format, args.calls_per_month, args.config)
 
     if args.command == "diff":
         from tokentoll.core.pipeline import run_diff_command
@@ -70,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             head=args.head,
             output_format=args.format,
             calls_per_month=args.calls_per_month,
+            config_path=args.config,
         )
 
     if args.command == "update":

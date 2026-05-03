@@ -58,6 +58,7 @@ class CostEstimate:
     estimated_cost_per_call: float | None = None
     monthly_estimate: float | None = None
     model_found: bool = False
+    used_default_model: str | None = None
     notes: list[str] = field(default_factory=list)
 
 

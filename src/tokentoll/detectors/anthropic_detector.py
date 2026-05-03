@@ -7,6 +7,7 @@ from tokentoll.detectors.base import BaseDetector
 from tokentoll.scanner.python_scanner import (
     chain_ends_with,
     estimate_tokens_from_messages,
+    estimate_tokens_from_string,
     extract_string_literal,
     find_imports,
     find_imports_by_name,
@@ -69,13 +70,13 @@ class AnthropicDetector(BaseDetector):
             est_input = None
             messages_node = get_keyword_value(node, "messages")
             if messages_node:
-                est_input = estimate_tokens_from_messages(messages_node)
+                est_input = estimate_tokens_from_messages(messages_node, model)
 
             system_node = get_keyword_value(node, "system")
             if system_node:
                 s = extract_string_literal(system_node)
                 if s:
-                    system_tokens = max(1, len(s) // 4)
+                    system_tokens = estimate_tokens_from_string(s, model)
                     est_input = (est_input or 0) + system_tokens
 
             calls.append(

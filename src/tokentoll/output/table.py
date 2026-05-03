@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import sys
 
-from tokentoll.core.models import DiffReport, ScanReport
+from tokentoll.core.models import CostEstimate, DiffReport, ScanReport
+
+
+def _model_display(model: str | None, est: CostEstimate | None = None) -> str:
+    if model:
+        return model
+    if est and est.used_default_model:
+        return f"{est.used_default_model} (default)"
+    return "<dynamic>"
 
 
 def _fmt_cost(val: float | None) -> str:
@@ -37,7 +45,7 @@ def print_scan_report(report: ScanReport) -> None:
             current_file = est.call.file_path
             print(f"File: {current_file}")
 
-        model_str = est.call.model or "<dynamic>"
+        model_str = _model_display(est.call.model, est)
         max_tok_str = str(est.call.max_tokens) if est.call.max_tokens else "default"
 
         print(f"  Line {est.call.line_number}: {est.call.sdk} {est.call.raw_expression}")
@@ -87,8 +95,8 @@ def print_diff_report(report: DiffReport) -> None:
         print(f"{prefix} {label:8s} {call.file_path}:{call.line_number}")
 
         if d.change_type.value == "modified" and d.old_call and d.new_call:
-            old_model = d.old_call.model or "<dynamic>"
-            new_model = d.new_call.model or "<dynamic>"
+            old_model = _model_display(d.old_call.model, d.old_estimate)
+            new_model = _model_display(d.new_call.model, d.new_estimate)
             print(f"          {call.sdk} | Model: {old_model} -> {new_model}")
             if d.old_estimate and d.new_estimate:
                 print(
@@ -99,7 +107,7 @@ def print_diff_report(report: DiffReport) -> None:
                 )
         elif d.change_type.value == "added":
             est = d.new_estimate
-            model_str = call.model or "<dynamic>"
+            model_str = _model_display(call.model, est)
             print(f"          {call.sdk} | Model: {model_str}")
             if est and est.model_found:
                 print(
@@ -108,7 +116,7 @@ def print_diff_report(report: DiffReport) -> None:
                 )
         elif d.change_type.value == "removed":
             est = d.old_estimate
-            model_str = call.model or "<dynamic>"
+            model_str = _model_display(call.model, est)
             print(f"          {call.sdk} | Model: {model_str}")
             if est and est.model_found:
                 print(f"          Monthly: {_fmt_delta(d.monthly_delta)}")

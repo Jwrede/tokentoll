@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from tokentoll.core.models import DiffReport, ScanReport
+from tokentoll.core.models import CostEstimate, DiffReport, ScanReport
+
+
+def _model_display(model: str | None, est: CostEstimate | None = None) -> str:
+    if model:
+        return model
+    if est and est.used_default_model:
+        return f"{est.used_default_model} (default)"
+    return "<dynamic>"
 
 
 def _fmt_cost(val: float | None) -> str:
@@ -32,7 +40,7 @@ def format_scan_report_markdown(report: ScanReport) -> str:
     ]
 
     for est in report.estimates:
-        model = est.call.model or "<dynamic>"
+        model = _model_display(est.call.model, est)
         cost = _fmt_cost(est.estimated_cost_per_call) if est.model_found else "N/A"
         monthly = _fmt_cost(est.monthly_estimate) if est.model_found else "N/A"
         lines.append(
@@ -85,8 +93,8 @@ def format_diff_report_markdown(report: DiffReport) -> str:
         icon = icons.get(d.change_type.value, "")
 
         if d.change_type.value == "modified" and d.old_call and d.new_call:
-            old_model = d.old_call.model or "<dynamic>"
-            new_model = d.new_call.model or "<dynamic>"
+            old_model = _model_display(d.old_call.model, d.old_estimate)
+            new_model = _model_display(d.new_call.model, d.new_estimate)
             model_str = f"{old_model} -> {new_model}"
             cost_str = (
                 f"{_fmt_cost(d.old_estimate.estimated_cost_per_call if d.old_estimate else None)}"
@@ -94,8 +102,8 @@ def format_diff_report_markdown(report: DiffReport) -> str:
                 f"{_fmt_cost(d.new_estimate.estimated_cost_per_call if d.new_estimate else None)}"
             )
         else:
-            model_str = call.model or "<dynamic>"
             est = d.new_estimate or d.old_estimate
+            model_str = _model_display(call.model, est)
             cost_str = _fmt_cost(est.estimated_cost_per_call if est else None)
 
         delta_str = _fmt_delta(d.monthly_delta)

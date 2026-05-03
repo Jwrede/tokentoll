@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+from tokentoll.config import ProjectConfig, load_config, resolve_for_path
 from tokentoll.core.models import (
     ChangeType,
     CostEstimate,
@@ -30,12 +32,25 @@ def _build_scan_report(
     )
 
 
-def run_scan(paths: list[str], output_format: str, calls_per_month: int) -> int:
+def run_scan(
+    paths: list[str],
+    output_format: str,
+    calls_per_month: int | None,
+    config_path: str | None = None,
+) -> int:
+    config = _load_project_config(config_path, paths)
+    effective_cpm = calls_per_month or config.calls_per_month or 1000
+
     calls = scan_paths(paths)
     engine = PricingEngine()
 
-    estimates = [engine.estimate(call, calls_per_month) for call in calls]
-    report = _build_scan_report(estimates, calls_per_month, engine.warnings)
+    estimates = []
+    for call in calls:
+        resolved = resolve_for_path(config, call.file_path)
+        cpm = calls_per_month or resolved.calls_per_month or effective_cpm
+        estimates.append(engine.estimate(call, cpm, default_model=resolved.default_model))
+
+    report = _build_scan_report(estimates, effective_cpm, engine.warnings)
 
     if output_format == "json":
         from tokentoll.output.json_output import format_scan_report_json
@@ -53,12 +68,22 @@ def run_scan(paths: list[str], output_format: str, calls_per_month: int) -> int:
     return 0
 
 
+def _load_project_config(config_path: str | None, paths: list[str] | None = None) -> ProjectConfig:
+    if config_path:
+        from tokentoll.config import _parse_config_file
+
+        return _parse_config_file(Path(config_path))
+    search_from = Path(paths[0]).resolve() if paths else None
+    return load_config(search_from)
+
+
 def run_diff_command(
     ref: str | None,
     base: str | None,
     head: str | None,
     output_format: str,
-    calls_per_month: int,
+    calls_per_month: int | None,
+    config_path: str | None = None,
 ) -> int:
     from tokentoll.diff.git import get_changed_files, get_file_at_ref
 
@@ -75,6 +100,9 @@ def run_diff_command(
     if not changed_files:
         print("No Python files changed.")
         return 0
+
+    config = _load_project_config(config_path)
+    effective_cpm = calls_per_month or config.calls_per_month or 1000
 
     engine = PricingEngine()
 
@@ -94,7 +122,7 @@ def run_diff_command(
 
     from tokentoll.diff.engine import compute_diff
 
-    call_diffs = compute_diff(old_calls_map, new_calls_map, engine, calls_per_month)
+    call_diffs = compute_diff(old_calls_map, new_calls_map, engine, effective_cpm, config)
 
     total_delta = 0.0
     added = removed = modified = 0
@@ -117,7 +145,7 @@ def run_diff_command(
         total_calls_removed=removed,
         total_calls_modified=modified,
         warnings=engine.warnings,
-        assumptions=[f"{calls_per_month} calls/month per call site"],
+        assumptions=[f"{effective_cpm} calls/month per call site"],
     )
 
     if output_format == "json":

@@ -68,7 +68,7 @@ class GoogleDetector(BaseDetector):
             if contents_node:
                 s = extract_string_literal(contents_node)
                 if s:
-                    est_input = estimate_tokens_from_string(s)
+                    est_input = estimate_tokens_from_string(s, model)
 
             calls.append(
                 LLMCall(
