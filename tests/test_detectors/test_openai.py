@@ -214,6 +214,28 @@ def call_llm():
     assert calls[0].model == "gpt-4o"
 
 
+def test_factory_client():
+    source = """
+from openai.types.chat import ChatCompletion
+client = get_openai_client()
+client.chat.completions.create(model="gpt-4o", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
+def test_method_parameter_client():
+    source = """
+import openai
+def call(self, client):
+    return client.chat.completions.create(model="gpt-4o-mini", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o-mini"
+
+
 def test_no_openai_import():
     source = """
 import requests

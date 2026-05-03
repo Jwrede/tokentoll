@@ -38,21 +38,6 @@ class GoogleDetector(BaseDetector):
         variables: dict[str, str | int] | None = None,
     ) -> list[LLMCall]:
         variables = variables or {}
-        genai_names = find_imports(tree, "google.genai")
-        genai_names += find_imports_by_name(tree, {"genai"})
-        google_names = find_imports(tree, "google")
-
-        client_vars: set[str] = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and len(node.targets) == 1:
-                target = node.targets[0]
-                if isinstance(target, ast.Name) and isinstance(node.value, ast.Call):
-                    chain = get_attribute_chain(node.value.func)
-                    chain_str = ".".join(chain)
-                    if "Client" in chain_str or "genai" in chain_str:
-                        client_vars.add(target.id)
-
-        valid_bases = client_vars | set(genai_names) | set(google_names)
         calls: list[LLMCall] = []
 
         for node in ast.walk(tree):
@@ -71,8 +56,6 @@ class GoogleDetector(BaseDetector):
             if call_type is None:
                 continue
 
-            if chain[0] not in valid_bases and not any(b in ".".join(chain) for b in valid_bases):
-                continue
 
             model_node = get_keyword_value(node, "model")
             model = resolve_string(model_node, variables, call=node, kwarg_name="model")

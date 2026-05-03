@@ -9,7 +9,6 @@ from tokentoll.scanner.python_scanner import (
     estimate_tokens_from_messages,
     estimate_tokens_from_string,
     extract_string_literal,
-    find_assigned_names,
     find_imports,
     find_imports_by_name,
     get_attribute_chain,
@@ -46,16 +45,6 @@ class OpenAIDetector(BaseDetector):
         variables: dict[str, str | int] | None = None,
     ) -> list[LLMCall]:
         variables = variables or {}
-        imported_names = find_imports(tree, "openai")
-        imported_names += find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"})
-        client_vars = find_assigned_names(tree, _CLIENT_CLASSES)
-
-        module_aliases: set[str] = set()
-        for name in imported_names:
-            if name == "openai" or name not in _CLIENT_CLASSES:
-                module_aliases.add(name)
-
-        valid_bases = client_vars | module_aliases | _CLIENT_CLASSES
         calls: list[LLMCall] = []
 
         for node in ast.walk(tree):
@@ -64,8 +53,6 @@ class OpenAIDetector(BaseDetector):
 
             chain = get_attribute_chain(node.func)
             if len(chain) < 2:
-                continue
-            if chain[0] not in valid_bases:
                 continue
 
             call_type = None
