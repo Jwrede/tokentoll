@@ -9,6 +9,8 @@ class CallType(Enum):
     EMBEDDING = "embedding"
     IMAGE_GENERATION = "image_generation"
     RESPONSES = "responses"
+    TRANSCRIPTION = "transcription"
+    SPEECH = "speech"
 
 
 class ChangeType(Enum):

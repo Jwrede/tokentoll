@@ -8,6 +8,7 @@ from tokentoll.scanner.python_scanner import (
     estimate_tokens_from_messages,
     extract_string_literal,
     find_imports,
+    find_imports_by_name,
     get_attribute_chain,
     get_keyword_value,
     resolve_int,
@@ -20,6 +21,12 @@ _FUNCTION_MAP: dict[str, CallType] = {
     "text_completion": CallType.CHAT_COMPLETION,
     "embedding": CallType.EMBEDDING,
     "aembedding": CallType.EMBEDDING,
+    "image_generation": CallType.IMAGE_GENERATION,
+    "aimage_generation": CallType.IMAGE_GENERATION,
+    "transcription": CallType.TRANSCRIPTION,
+    "atranscription": CallType.TRANSCRIPTION,
+    "speech": CallType.SPEECH,
+    "aspeech": CallType.SPEECH,
 }
 
 
@@ -28,7 +35,9 @@ class LiteLLMDetector(BaseDetector):
         return "litellm"
 
     def can_handle(self, tree: ast.Module, source: str) -> bool:
-        return bool(find_imports(tree, "litellm"))
+        if find_imports(tree, "litellm"):
+            return True
+        return bool(find_imports_by_name(tree, {"litellm"} | set(_FUNCTION_MAP)))
 
     def detect(
         self,
@@ -38,6 +47,7 @@ class LiteLLMDetector(BaseDetector):
     ) -> list[LLMCall]:
         variables = variables or {}
         imported_names = find_imports(tree, "litellm")
+        imported_names += find_imports_by_name(tree, {"litellm"} | set(_FUNCTION_MAP))
 
         direct_imports: set[str] = set()
         module_aliases: set[str] = set()

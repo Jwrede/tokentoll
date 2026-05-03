@@ -10,6 +10,7 @@ from tokentoll.scanner.python_scanner import (
     extract_int_literal,
     extract_string_literal,
     find_imports,
+    find_imports_by_name,
     get_attribute_chain,
     get_keyword_value,
     resolve_string,
@@ -26,7 +27,9 @@ class GoogleDetector(BaseDetector):
         return "google_genai"
 
     def can_handle(self, tree: ast.Module, source: str) -> bool:
-        return bool(find_imports(tree, "google.genai") or find_imports(tree, "google"))
+        if find_imports(tree, "google.genai") or find_imports(tree, "google"):
+            return True
+        return bool(find_imports_by_name(tree, {"genai"}))
 
     def detect(
         self,
@@ -36,6 +39,7 @@ class GoogleDetector(BaseDetector):
     ) -> list[LLMCall]:
         variables = variables or {}
         genai_names = find_imports(tree, "google.genai")
+        genai_names += find_imports_by_name(tree, {"genai"})
         google_names = find_imports(tree, "google")
 
         client_vars: set[str] = set()

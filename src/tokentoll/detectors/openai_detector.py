@@ -11,6 +11,7 @@ from tokentoll.scanner.python_scanner import (
     extract_string_literal,
     find_assigned_names,
     find_imports,
+    find_imports_by_name,
     get_attribute_chain,
     get_keyword_value,
     resolve_int,
@@ -24,6 +25,8 @@ _CALL_PATTERNS: list[tuple[list[str], CallType]] = [
     (["responses", "create"], CallType.RESPONSES),
     (["embeddings", "create"], CallType.EMBEDDING),
     (["images", "generate"], CallType.IMAGE_GENERATION),
+    (["audio", "transcriptions", "create"], CallType.TRANSCRIPTION),
+    (["audio", "speech", "create"], CallType.SPEECH),
 ]
 
 
@@ -32,7 +35,9 @@ class OpenAIDetector(BaseDetector):
         return "openai"
 
     def can_handle(self, tree: ast.Module, source: str) -> bool:
-        return bool(find_imports(tree, "openai"))
+        if find_imports(tree, "openai"):
+            return True
+        return bool(find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"}))
 
     def detect(
         self,
@@ -42,6 +47,7 @@ class OpenAIDetector(BaseDetector):
     ) -> list[LLMCall]:
         variables = variables or {}
         imported_names = find_imports(tree, "openai")
+        imported_names += find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"})
         client_vars = find_assigned_names(tree, _CLIENT_CLASSES)
 
         module_aliases: set[str] = set()

@@ -202,6 +202,18 @@ openai.chat.completions.create(model="gpt-4o", messages=[])
     assert calls[0].model == "gpt-4o"
 
 
+def test_lazy_import():
+    source = """
+def call_llm():
+    from openai import OpenAI
+    client = OpenAI()
+    return client.chat.completions.create(model="gpt-4o", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
 def test_no_openai_import():
     source = """
 import requests

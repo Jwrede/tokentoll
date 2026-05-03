@@ -134,7 +134,7 @@ def find_imports(tree: ast.Module, package: str) -> list[str]:
     'import openai'.
     """
     names: list[str] = []
-    for node in ast.iter_child_nodes(tree):
+    for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name == package or alias.name.startswith(package + "."):
@@ -144,6 +144,27 @@ def find_imports(tree: ast.Module, package: str) -> list[str]:
                 for alias in node.names:
                     names.append(alias.asname or alias.name)
     return names
+
+
+def find_imports_by_name(tree: ast.Module, names: set[str]) -> list[str]:
+    """Find imports where the resulting local name matches, regardless of source package.
+
+    Catches re-exports like 'from aider.llm import litellm' where the name
+    'litellm' is imported from a wrapper, not the original package.
+    """
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                local = alias.asname or alias.name
+                if local in names:
+                    found.append(local)
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                local = alias.asname or alias.name
+                if local in names:
+                    found.append(local)
+    return found
 
 
 def find_assigned_names(tree: ast.Module, class_names: set[str]) -> set[str]:

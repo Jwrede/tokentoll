@@ -62,3 +62,13 @@ completion("openai/gpt-4o", messages=[])
     calls = _detect(source)
     assert len(calls) == 1
     assert calls[0].model == "openai/gpt-4o"
+
+
+def test_reexported_module():
+    source = """
+from myapp.llm import litellm
+litellm.completion(model="gpt-4o", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"

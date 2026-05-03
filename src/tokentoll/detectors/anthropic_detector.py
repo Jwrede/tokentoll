@@ -10,6 +10,7 @@ from tokentoll.scanner.python_scanner import (
     extract_string_literal,
     find_assigned_names,
     find_imports,
+    find_imports_by_name,
     get_attribute_chain,
     get_keyword_value,
     resolve_int,
@@ -29,7 +30,9 @@ class AnthropicDetector(BaseDetector):
         return "anthropic"
 
     def can_handle(self, tree: ast.Module, source: str) -> bool:
-        return bool(find_imports(tree, "anthropic"))
+        if find_imports(tree, "anthropic"):
+            return True
+        return bool(find_imports_by_name(tree, _CLIENT_CLASSES | {"anthropic"}))
 
     def detect(
         self,
@@ -39,6 +42,7 @@ class AnthropicDetector(BaseDetector):
     ) -> list[LLMCall]:
         variables = variables or {}
         imported_names = find_imports(tree, "anthropic")
+        imported_names += find_imports_by_name(tree, _CLIENT_CLASSES | {"anthropic"})
         client_vars = find_assigned_names(tree, _CLIENT_CLASSES)
 
         module_aliases: set[str] = set()
