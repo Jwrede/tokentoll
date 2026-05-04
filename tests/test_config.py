@@ -148,3 +148,51 @@ def test_resolve_for_path_calls_per_month_override():
 
     resolved2 = resolve_for_path(config, "src/cold/batch.py")
     assert resolved2.calls_per_month == 1000
+
+
+def test_parse_yaml_skip_dynamic_models():
+    text = """
+skip_dynamic_models: true
+overrides:
+  - path: src/strict/
+    skip_dynamic_models: true
+  - path: src/loose/
+    skip_dynamic_models: false
+"""
+    data = _parse_simple_yaml(text)
+    assert data["skip_dynamic_models"] is True
+    assert data["overrides"][0]["skip_dynamic_models"] is True
+    assert data["overrides"][1]["skip_dynamic_models"] is False
+
+
+def test_load_config_skip_dynamic_models():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / ".tokentoll.yml"
+        config_path.write_text("skip_dynamic_models: true\n")
+        config = load_config(Path(tmpdir))
+        assert config.skip_dynamic_models is True
+
+
+def test_resolve_for_path_skip_dynamic_models_override():
+    config = ProjectConfig(
+        skip_dynamic_models=False,
+        overrides=[
+            PathOverride(path="src/strict", skip_dynamic_models=True),
+        ],
+    )
+    resolved_strict = resolve_for_path(config, "src/strict/file.py")
+    assert resolved_strict.skip_dynamic_models is True
+
+    resolved_default = resolve_for_path(config, "src/other/file.py")
+    assert resolved_default.skip_dynamic_models is False
+
+
+def test_resolve_for_path_skip_dynamic_models_disabled_by_override():
+    config = ProjectConfig(
+        skip_dynamic_models=True,
+        overrides=[
+            PathOverride(path="src/loose", skip_dynamic_models=False),
+        ],
+    )
+    resolved = resolve_for_path(config, "src/loose/file.py")
+    assert resolved.skip_dynamic_models is False

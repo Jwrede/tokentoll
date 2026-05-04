@@ -11,6 +11,7 @@ class PathOverride:
     default_model: str | None = None
     default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
+    skip_dynamic_models: bool | None = None
 
 
 @dataclass
@@ -18,6 +19,7 @@ class ProjectConfig:
     default_model: str | None = None
     default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
+    skip_dynamic_models: bool = False
     overrides: list[PathOverride] = field(default_factory=list)
     project_root: str | None = None
 
@@ -27,6 +29,7 @@ class ResolvedConfig:
     default_model: str | None = None
     default_models: dict[str, str] = field(default_factory=dict)
     calls_per_month: int | None = None
+    skip_dynamic_models: bool = False
 
 
 _CONFIG_FILENAME = ".tokentoll.yml"
@@ -73,14 +76,22 @@ def resolve_for_path(config: ProjectConfig, file_path: str) -> ResolvedConfig:
     dm = config.default_model
     dms = dict(config.default_models)
     cpm = config.calls_per_month
+    skip = config.skip_dynamic_models
     if best:
         if best.default_model is not None:
             dm = best.default_model
         dms.update(best.default_models)
         if best.calls_per_month is not None:
             cpm = best.calls_per_month
+        if best.skip_dynamic_models is not None:
+            skip = best.skip_dynamic_models
 
-    return ResolvedConfig(default_model=dm, default_models=dms, calls_per_month=cpm)
+    return ResolvedConfig(
+        default_model=dm,
+        default_models=dms,
+        calls_per_month=cpm,
+        skip_dynamic_models=skip,
+    )
 
 
 def _parse_config_file(path: Path) -> ProjectConfig:
@@ -104,22 +115,29 @@ def _data_to_config(data: dict) -> ProjectConfig:
     cpm = data.get("calls_per_month")
     if cpm is not None:
         cpm = int(cpm)
+    skip = bool(data.get("skip_dynamic_models", False))
 
     overrides: list[PathOverride] = []
     for item in data.get("overrides", []):
         if isinstance(item, dict) and "path" in item:
             o_cpm = item.get("calls_per_month")
+            o_skip = item.get("skip_dynamic_models")
             overrides.append(
                 PathOverride(
                     path=str(item["path"]),
                     default_model=item.get("default_model"),
                     default_models=_parse_default_models(item),
                     calls_per_month=int(o_cpm) if o_cpm is not None else None,
+                    skip_dynamic_models=bool(o_skip) if o_skip is not None else None,
                 )
             )
 
     return ProjectConfig(
-        default_model=dm, default_models=dms, calls_per_month=cpm, overrides=overrides
+        default_model=dm,
+        default_models=dms,
+        calls_per_month=cpm,
+        skip_dynamic_models=skip,
+        overrides=overrides,
     )
 
 

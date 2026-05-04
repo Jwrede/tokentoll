@@ -25,7 +25,8 @@ def compute_diff(
         dm = resolved.default_model if resolved else None
         dms = resolved.default_models if resolved else None
         cpm = resolved.calls_per_month if resolved and resolved.calls_per_month else calls_per_month
-        diffs.extend(_diff_file(old_calls, new_calls, engine, cpm, dm, dms))
+        skip = resolved.skip_dynamic_models if resolved else False
+        diffs.extend(_diff_file(old_calls, new_calls, engine, cpm, dm, dms, skip))
 
     return diffs
 
@@ -37,6 +38,7 @@ def _diff_file(
     calls_per_month: int,
     default_model: str | None = None,
     default_models: dict[str, str] | None = None,
+    skip_dynamic_models: bool = False,
 ) -> list[CallDiff]:
     matched_old: set[int] = set()
     matched_new: set[int] = set()
@@ -54,12 +56,14 @@ def _diff_file(
                 calls_per_month,
                 default_model=default_model,
                 default_models=default_models,
+                skip_dynamic_models=skip_dynamic_models,
             )
             new_est = engine.estimate(
                 nc,
                 calls_per_month,
                 default_model=default_model,
                 default_models=default_models,
+                skip_dynamic_models=skip_dynamic_models,
             )
 
             if _calls_differ(oc, nc):
@@ -86,6 +90,7 @@ def _diff_file(
                 calls_per_month,
                 default_model=default_model,
                 default_models=default_models,
+                skip_dynamic_models=skip_dynamic_models,
             )
             diffs.append(
                 CallDiff(
@@ -104,6 +109,7 @@ def _diff_file(
                 calls_per_month,
                 default_model=default_model,
                 default_models=default_models,
+                skip_dynamic_models=skip_dynamic_models,
             )
             monthly = -est.monthly_estimate if est.monthly_estimate else None
             cost = -est.estimated_cost_per_call if est.estimated_cost_per_call else None

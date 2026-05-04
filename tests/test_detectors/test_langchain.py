@@ -65,21 +65,27 @@ llm = AzureChatOpenAI(deployment_name="my-deployment", model="gpt-4o", max_token
     assert calls[0].model == "gpt-4o"
 
 
-def test_azure_chat_openai_without_model_skipped():
-    # AzureChatOpenAI(deployment_name=...) alone does not tell us which
-    # model is behind the deployment, so we can't price it. Skip.
+def test_azure_chat_openai_without_model_uses_default():
+    # AzureChatOpenAI(deployment_name=...) without a model= argument is treated
+    # as a dynamic model: we can't statically know which model the deployment
+    # maps to, so the pricing engine applies the per-SDK default. Users who
+    # prefer to suppress these can set skip_dynamic_models in .tokentoll.yml.
     source = """
 from langchain_openai import AzureChatOpenAI
 llm = AzureChatOpenAI(deployment_name="my-deployment", max_tokens=512)
 """
     calls = _detect(source)
-    assert calls == []
+    assert len(calls) == 1
+    assert calls[0].sdk == "langchain"
+    assert calls[0].model is None
+    assert calls[0].max_tokens == 512
 
 
-def test_azure_chat_openai_with_azure_deployment_only_skipped():
+def test_azure_chat_openai_with_azure_deployment_only_uses_default():
     source = """
 from langchain_openai import AzureChatOpenAI
 llm = AzureChatOpenAI(azure_deployment="my-deployment")
 """
     calls = _detect(source)
-    assert calls == []
+    assert len(calls) == 1
+    assert calls[0].model is None

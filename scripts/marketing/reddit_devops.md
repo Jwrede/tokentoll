@@ -15,7 +15,7 @@ Python code for LLM API calls, estimates their cost, and posts the delta as a
 PR comment.
 
 ```yaml
-- uses: Jwrede/tokentoll@v0.5.2
+- uses: Jwrede/tokentoll@v0.6.1
 ```
 
 ![demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
@@ -31,7 +31,7 @@ get claude-sonnet pricing, Google calls get gemini-flash, and so on.
 Same concept as Infracost for Terraform, but for LLM API spend.
 
 - Pricing data from LiteLLM (2200+ models), auto-cached
-- Supports OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain
+- Supports OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu (GLM)
 - Configurable via `.tokentoll.yml` (per-path overrides, custom defaults)
 - Zero runtime dependencies
 - MIT licensed

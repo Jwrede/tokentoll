@@ -54,6 +54,7 @@ def run_scan(
                 cpm,
                 default_model=resolved.default_model,
                 default_models=resolved.default_models,
+                skip_dynamic_models=resolved.skip_dynamic_models,
             )
         )
 

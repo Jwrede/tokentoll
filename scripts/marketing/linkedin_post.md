@@ -9,7 +9,7 @@ change before it hits production.
 
 How it works:
 - Parses Python source code using the ast module
-- Detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, and LangChain
+- Detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, and Zhipu (GLM)
 - Looks up real pricing data (2200+ models)
 - Applies per-SDK defaults for dynamic models (Anthropic -> claude-sonnet, Google -> gemini-flash)
 - Shows cost delta per commit or PR

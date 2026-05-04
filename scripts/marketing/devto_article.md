@@ -58,6 +58,7 @@ tokentoll uses Python's `ast` module to find calls to:
 - **Google GenAI**: `models.generate_content`
 - **LiteLLM**: `completion`, `acompletion`
 - **LangChain**: `ChatOpenAI`, `ChatAnthropic`, `init_chat_model`
+- **Zhipu AI**: `ZhipuAiClient`, `ZhipuAI` (GLM models)
 
 For each call, it extracts the model name, max_tokens, and any estimable token
 counts from prompt strings. Then it looks up real pricing from a database of
@@ -74,6 +75,7 @@ sensible per-SDK defaults:
 | OpenAI | gpt-4o |
 | Anthropic | claude-sonnet-4-20250514 |
 | Google GenAI | gemini-2.0-flash |
+| Zhipu AI | zai/glm-4.6 |
 
 These are shown as `gpt-4o (default)` in scan output. You can override them
 per-project or per-path via a `.tokentoll.yml` config file.
@@ -117,7 +119,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Jwrede/tokentoll@v0.5.2
+      - uses: Jwrede/tokentoll@v0.6.1
 ```
 
 ### Configuration

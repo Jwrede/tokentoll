@@ -21,8 +21,8 @@ tokentoll diff HEAD~1     # show cost impact of last commit
 
 ![demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
 
-It detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, and LangChain
-SDKs using Python's ast module. Pricing data comes from LiteLLM's database
+It detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, and
+Zhipu (GLM) SDKs using Python's ast module. Pricing data comes from LiteLLM's database
 (2200+ models) and is cached locally.
 
 When model names are dynamic (loaded from env vars or config), it applies

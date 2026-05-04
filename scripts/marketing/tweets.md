@@ -23,7 +23,7 @@ How it works:
 
 1. Parses your Python with ast module
 2. Multi-pass constant propagation resolves model names through variables, **kwargs, class attrs
-3. Detects OpenAI, Anthropic, Google, LiteLLM, LangChain calls
+3. Detects OpenAI, Anthropic, Google, LiteLLM, LangChain, Zhipu (GLM) calls
 4. Looks up real pricing (2200+ models, auto-cached)
 5. Shows you the cost delta
 
@@ -39,7 +39,7 @@ Model swap? New API call? Removed endpoint? You see the dollar impact before mer
 
 3 lines of YAML to add it to any repo:
 
-- uses: Jwrede/tokentoll@v0.5.2
+- uses: Jwrede/tokentoll@v0.6.1
 
 ## Tweet 4 (CTA)
 

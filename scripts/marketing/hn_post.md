@@ -22,7 +22,7 @@ every change.
     tokentoll diff HEAD~1     # show cost impact of last commit
 
 It uses Python's ast module to detect calls to OpenAI, Anthropic, Google GenAI,
-LiteLLM, and LangChain SDKs. A multi-pass constant propagation engine follows
+LiteLLM, LangChain, and Zhipu (GLM) SDKs. A multi-pass constant propagation engine follows
 variable assignments, class attributes, **kwargs, os.getenv() fallbacks, and
 constructor arguments to resolve model names that aren't string literals.
 

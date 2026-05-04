@@ -170,10 +170,19 @@ class PricingEngine:
         calls_per_month: int = 1000,
         default_model: str | None = None,
         default_models: dict[str, str] | None = None,
+        skip_dynamic_models: bool = False,
     ) -> CostEstimate:
         notes: list[str] = []
 
         if not call.model:
+            if skip_dynamic_models:
+                return CostEstimate(
+                    call=call,
+                    pricing=None,
+                    model_found=False,
+                    notes=["Dynamic model, skipped per config (skip_dynamic_models)"],
+                )
+
             resolved_default = None
             source = ""
             if default_models and call.sdk in default_models:

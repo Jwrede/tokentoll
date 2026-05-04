@@ -86,11 +86,6 @@ class LangChainDetector(BaseDetector):
                 model_node = node.args[0]
             model = resolve_string(model_node, variables, call=node, kwarg_name="model")
 
-            # AzureChatOpenAI(deployment_name=...) is not a model name. Skip the call
-            # rather than apply a misleading default price.
-            if func_name == "AzureChatOpenAI" and model is None:
-                continue
-
             max_tokens_node = get_keyword_value(node, "max_tokens") or get_keyword_value(
                 node, "max_output_tokens"
             )

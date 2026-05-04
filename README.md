@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: Jwrede/tokentoll@v0.6.0
+      - uses: Jwrede/tokentoll@v0.6.1
 ```
 
 ## What It Detects
@@ -214,6 +214,12 @@ default_models:
 # Assumed calls per month per call site
 calls_per_month: 5000
 
+# Skip cost estimation entirely for dynamic (unresolved) models. When true,
+# calls whose model name cannot be resolved statically are reported with no
+# cost rather than priced against a default. Useful for projects that prefer
+# silence over a guess.
+skip_dynamic_models: false
+
 # Per-path overrides (longest prefix match)
 overrides:
   - path: tests/
@@ -221,6 +227,8 @@ overrides:
   - path: src/agents/
     default_model: gpt-4o
     calls_per_month: 10000
+  - path: src/azure/
+    skip_dynamic_models: true
 ```
 
 Resolution order for dynamic model defaults: per-SDK config (`default_models`) >

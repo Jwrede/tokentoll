@@ -114,6 +114,33 @@ def test_estimate_dynamic_with_bad_default_model():
     assert "not found" in est.notes[0].lower()
 
 
+def test_estimate_skip_dynamic_models():
+    call = LLMCall(
+        file_path="test.py",
+        line_number=1,
+        sdk="openai",
+        call_type=CallType.CHAT_COMPLETION,
+        model=None,
+        model_is_literal=False,
+        max_tokens=None,
+    )
+    engine = PricingEngine()
+    est = engine.estimate(call, skip_dynamic_models=True)
+    assert est.model_found is False
+    assert est.estimated_cost_per_call is None
+    assert est.monthly_estimate is None
+    assert any("skipped" in n.lower() for n in est.notes)
+
+
+def test_estimate_skip_dynamic_models_does_not_affect_known_model():
+    engine = PricingEngine()
+    call = _make_call("gpt-4o", max_tokens=1000)
+    est = engine.estimate(call, calls_per_month=1000, skip_dynamic_models=True)
+    assert est.model_found is True
+    assert est.estimated_cost_per_call is not None
+    assert est.estimated_cost_per_call > 0
+
+
 def test_estimate_resolved_model_ignores_default():
     """When model IS resolved, default_model should be ignored."""
     call = _make_call("gpt-4o")

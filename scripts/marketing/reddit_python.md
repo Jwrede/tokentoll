@@ -7,7 +7,7 @@ I built a zero-dependency CLI that finds LLM API calls in your Python code and e
 ## Body
 
 **tokentoll** uses Python's `ast` module to statically analyze your codebase for
-LLM API calls (OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain) and
+LLM API calls (OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu/GLM) and
 estimates their cost using real pricing data.
 
 ```
