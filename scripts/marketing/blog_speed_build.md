@@ -9,25 +9,26 @@ tags: llm, python, devtools, building
 ## The idea
 
 Every team using LLM APIs has the same problem: cost surprises. A model swap,
-a new endpoint, a forgotten max_tokens parameter -- and suddenly the bill
-spikes.
+a new endpoint, a forgotten max_tokens parameter, and suddenly the bill spikes.
 
 Infracost solved this for Terraform by analyzing code diffs and showing cloud
 cost impact on PRs. Nobody had built the LLM equivalent.
 
 So I did, in a day.
 
+![tokentoll demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
+
 ## The architecture
 
 tokentoll has five layers:
 
-1. **Scanner** -- walks Python files, dispatches to detectors
-2. **Detectors** -- one per SDK (OpenAI, Anthropic, Google, LiteLLM, LangChain),
+1. **Scanner**: walks Python files, dispatches to detectors
+2. **Detectors**: one per SDK (OpenAI, Anthropic, Google, LiteLLM, LangChain),
    each knows how to find API calls in an AST
-3. **Pricing engine** -- model name -> cost per token, with tiered resolution
-   and a local cache
-4. **Diff engine** -- matches old vs new calls by file + line proximity
-5. **Output formatters** -- table (CLI), markdown (PR comment), JSON
+3. **Pricing engine**: model name -> cost per token, with tiered resolution,
+   per-SDK defaults for dynamic models, and a local cache
+4. **Diff engine**: matches old vs new calls by file + line proximity
+5. **Output formatters**: table (CLI), markdown (PR comment), JSON
 
 The key design decisions:
 
@@ -42,6 +43,11 @@ The key design decisions:
 - **Pricing is cached locally.** On first run, tokentoll fetches LiteLLM's
   pricing database (2200+ models) and caches it to `~/.tokentoll/`. It warns
   if the cache is stale and errors if it is very old.
+
+- **Per-SDK defaults.** When a model name is dynamic (loaded from config or
+  env vars at runtime), tokentoll applies the most common model for that SDK:
+  gpt-4o for OpenAI, claude-sonnet for Anthropic, gemini-flash for Google.
+  This means you always get cost estimates, even for dynamic code.
 
 ## The hardest part
 
@@ -60,29 +66,51 @@ The solution is a tiered resolution chain:
 This handles 95%+ of real-world model names I found scanning open-source
 projects.
 
+## Multi-pass constant propagation
+
+The second hardest part: model names are rarely string literals. They flow
+through variables, class attributes, config objects, and `**kwargs`.
+
+```python
+DEFAULT_MODEL = os.getenv("MODEL", "gpt-4o")
+
+class Config:
+    model: str = DEFAULT_MODEL
+
+config = Config()
+kwargs = {"model": config.model, "max_tokens": 2000}
+client.chat.completions.create(**kwargs)
+# tokentoll resolves: model="gpt-4o", max_tokens=2000
+```
+
+The engine iterates to a fixed point, following: variable assignments,
+`os.getenv()` fallbacks, function defaults, class attribute defaults,
+constructor argument propagation, dict contents, and `**kwargs` unpacking.
+
+## Configuration
+
+A `.tokentoll.yml` file lets you tune behavior per project:
+
+```yaml
+calls_per_month: 5000
+default_models:
+  openai: gpt-4o-mini
+  anthropic: claude-haiku-3-20240307
+overrides:
+  - path: tests/
+    calls_per_month: 100
+```
+
+Per-path overrides use longest-prefix matching, so you can set different
+assumptions for test code, agent pipelines, and batch jobs.
+
 ## Validation
 
-Before calling it done, I ran tokentoll against five real codebases:
-
-- **LiteLLM** (1,387 calls detected) -- the ultimate stress test
-- **LangChain** (429 calls) -- cross-SDK detection
-- **instructor** (10 calls) -- OpenAI patterns
-- **promptfoo** (5 calls) -- mixed patterns
-- **crewAI** (3 calls) -- deeply nested code
-
-1,834 total calls detected. Zero crashes. One bug found (Bedrock region
-prefix resolution), fixed in 10 minutes.
-
-## What I'd do differently
-
-If I were building this as a product (not a portfolio project):
-
-- **TypeScript/JS support.** Many LLM apps are Node.js. Tree-sitter would
-  handle the parsing.
-- **Config file.** Per-project overrides for call volume assumptions and
-  model aliases.
-- **Historical trending.** Store scan results over time, show cost trend
-  charts.
+Before calling it done, I ran tokentoll against twenty real codebases including
+NadirClaw, PraisonAI, agentops, swarms, honcho, atomic-agents, and others. It
+correctly detected OpenAI, Anthropic, Google, and LiteLLM calls across all of
+them, with per-SDK default models producing sensible cost estimates even for
+projects that load model names from config at runtime.
 
 ## Try it
 

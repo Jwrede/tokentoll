@@ -47,6 +47,8 @@ tokentoll scan .
 tokentoll diff HEAD~1
 ```
 
+![tokentoll demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
+
 ### What it detects
 
 tokentoll uses Python's `ast` module to find calls to:
@@ -60,6 +62,21 @@ tokentoll uses Python's `ast` module to find calls to:
 For each call, it extracts the model name, max_tokens, and any estimable token
 counts from prompt strings. Then it looks up real pricing from a database of
 2200+ models (sourced from LiteLLM).
+
+### Smart defaults for dynamic models
+
+Real codebases often load model names from config files or environment variables
+that can't be resolved at analysis time. Instead of giving up, tokentoll applies
+sensible per-SDK defaults:
+
+| SDK | Default Model |
+|-----|---------------|
+| OpenAI | gpt-4o |
+| Anthropic | claude-sonnet-4-20250514 |
+| Google GenAI | gemini-2.0-flash |
+
+These are shown as `gpt-4o (default)` in scan output. You can override them
+per-project or per-path via a `.tokentoll.yml` config file.
 
 ### The diff is where it shines
 
@@ -75,7 +92,6 @@ LLM Cost Diff: main..feature-branch
            openai | Model: gpt-4o -> gpt-4o-mini
            Est. cost/call: $0.03 -> $0.0003 | Monthly: -$26.20
 
---
 Monthly cost impact: +$0.30
   Added: 1 | Changed: 1 | Removed: 0
 ```
@@ -91,6 +107,7 @@ on:
     paths: ["**.py"]
 
 permissions:
+  contents: read
   pull-requests: write
 
 jobs:
@@ -100,7 +117,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Jwrede/tokentoll@v1
+      - uses: Jwrede/tokentoll@v0.5.2
+```
+
+### Configuration
+
+A `.tokentoll.yml` file lets you customize per-project behavior:
+
+```yaml
+calls_per_month: 5000
+
+default_models:
+  openai: gpt-4o-mini
+  anthropic: claude-haiku-3-20240307
+
+overrides:
+  - path: tests/
+    calls_per_month: 100
 ```
 
 ## How the AST parsing works
@@ -153,6 +186,7 @@ stripping (`gpt-4o-2024-08-06` -> `gpt-4o`).
 tokentoll is static analysis. It cannot:
 
 - Resolve models loaded from external config files or databases at runtime
+  (these get per-SDK default pricing instead)
 - Count tokens in computed prompts or template variables
 - Predict actual call volume (it assumes a configurable calls-per-month)
 
