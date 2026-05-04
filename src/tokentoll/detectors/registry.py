@@ -18,6 +18,7 @@ def _load_detectors() -> list[BaseDetector]:
     from tokentoll.detectors.langchain_detector import LangChainDetector
     from tokentoll.detectors.litellm_detector import LiteLLMDetector
     from tokentoll.detectors.openai_detector import OpenAIDetector
+    from tokentoll.detectors.zhipu_detector import ZhipuDetector
 
     return [
         OpenAIDetector(),
@@ -25,4 +26,5 @@ def _load_detectors() -> list[BaseDetector]:
         GoogleDetector(),
         LiteLLMDetector(),
         LangChainDetector(),
+        ZhipuDetector(),
     ]

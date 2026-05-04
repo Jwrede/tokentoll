@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: Jwrede/tokentoll@v0.5.2
+      - uses: Jwrede/tokentoll@v0.6.0
 ```
 
 ## What It Detects
@@ -72,6 +72,7 @@ jobs:
 | Google GenAI | `models.generate_content` | Supported |
 | LiteLLM | `completion`, `acompletion` | Supported |
 | LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
+| Zhipu AI | `ZhipuAiClient`, `ZhipuAI` (GLM models) | Supported |
 | JS/TS SDKs | | Planned |
 
 ## Example Output
@@ -191,6 +192,7 @@ it applies a sensible per-SDK default so you still get cost estimates:
 | Google GenAI | `gemini-2.0-flash` |
 | LiteLLM | `gpt-4o` |
 | LangChain | `gpt-4o` |
+| Zhipu AI | `zai/glm-4.6` |
 
 These defaults are shown as `gpt-4o (default)` in scan output. You can override
 them per-project or per-path using a `.tokentoll.yml` config file (see below).

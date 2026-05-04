@@ -13,11 +13,12 @@ from tokentoll.scanner.python_scanner import (
     find_imports_by_name,
     get_attribute_chain,
     get_keyword_value,
+    has_constructor_call,
     resolve_int,
     resolve_string,
 )
 
-_CLIENT_CLASSES = {"OpenAI", "AsyncOpenAI"}
+_CLIENT_CLASSES = {"OpenAI", "AsyncOpenAI", "AzureOpenAI", "AsyncAzureOpenAI"}
 
 _CALL_PATTERNS: list[tuple[list[str], CallType]] = [
     (["chat", "completions", "create"], CallType.CHAT_COMPLETION),
@@ -38,7 +39,9 @@ class OpenAIDetector(BaseDetector):
             return True
         if find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"}):
             return True
-        return False
+        # Catch DI-style code that builds the client without a visible import,
+        # e.g., a helper module that constructs OpenAI() inside a function.
+        return has_constructor_call(tree, _CLIENT_CLASSES)
 
     def detect(
         self,

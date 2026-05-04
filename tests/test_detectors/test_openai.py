@@ -258,9 +258,35 @@ client.chat.completions.create(model="gpt-4o-mini", messages=[])
     assert models == {"gpt-4o", "gpt-4o-mini"}
 
 
-def test_zhipu_compatible_client_not_detected():
+def test_constructor_without_visible_import():
+    # File has no openai import in any visible scope, but constructs OpenAI()
+    # directly. This catches DI helpers that take the client as a parameter
+    # in a separate module.
+    source = """
+def make_client():
+    return OpenAI(api_key="x")
+
+client = make_client()
+client.chat.completions.create(model="gpt-4o", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
+def test_azure_openai_constructor_detected():
+    source = """
+client = AzureOpenAI(api_key="x", api_version="2024-02-01")
+client.chat.completions.create(model="gpt-4o", messages=[])
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+
+
+def test_zhipu_compatible_client_not_detected_as_openai():
     # Zhipu's ZhipuAiClient exposes an OpenAI-compatible interface
-    # but is not OpenAI. We must not misidentify it as openai.
+    # but is not OpenAI. The dedicated Zhipu detector handles it; the
+    # OpenAI detector must not also fire on the same call.
     source = """
 from zai import ZhipuAiClient
 class ZhipuChat:
@@ -270,4 +296,4 @@ class ZhipuChat:
         return self._client.chat.completions.create(model="glm-4", messages=[])
 """
     calls = _detect(source)
-    assert calls == []
+    assert all(c.sdk != "openai" for c in calls)

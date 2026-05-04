@@ -39,7 +39,7 @@ runs:
 
     - name: Install tokentoll
       shell: bash
-      run: pip install 'tokentoll==0.5.2'
+      run: pip install 'tokentoll==0.6.0'
 
     - name: Run analysis
       id: run

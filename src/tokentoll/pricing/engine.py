@@ -25,6 +25,7 @@ _SDK_DEFAULT_MODELS: dict[str, str] = {
     "google_genai": "gemini-2.0-flash",
     "litellm": "gpt-4o",
     "langchain": "gpt-4o",
+    "zai": "zai/glm-4.6",
 }
 
 _DATE_SUFFIX_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")

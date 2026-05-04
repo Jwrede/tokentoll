@@ -191,6 +191,24 @@ def find_imports_by_name(tree: ast.Module, names: set[str]) -> list[str]:
     return found
 
 
+def has_constructor_call(tree: ast.Module, class_names: set[str]) -> bool:
+    """Return True if the AST contains a call to any of the given class names.
+
+    Matches both bare calls (`OpenAI()`) and attribute calls (`openai.OpenAI()`).
+    Used as a positive signal that an SDK is in use even when the file has
+    no top-level import (e.g., the client is constructed inside a function).
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id in class_names:
+            return True
+        if isinstance(func, ast.Attribute) and func.attr in class_names:
+            return True
+    return False
+
+
 def find_assigned_names(tree: ast.Module, class_names: set[str]) -> set[str]:
     """Find variable names assigned from constructor calls.
 

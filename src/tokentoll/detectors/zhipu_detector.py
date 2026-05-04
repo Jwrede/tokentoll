@@ -7,7 +7,6 @@ from tokentoll.detectors.base import BaseDetector
 from tokentoll.scanner.python_scanner import (
     chain_ends_with,
     estimate_tokens_from_messages,
-    estimate_tokens_from_string,
     extract_string_literal,
     find_imports,
     find_imports_by_name,
@@ -18,22 +17,24 @@ from tokentoll.scanner.python_scanner import (
     resolve_string,
 )
 
-_CLIENT_CLASSES = {"Anthropic", "AsyncAnthropic"}
+# ZhipuAiClient: zai SDK (current). ZhipuAI: zhipuai SDK (legacy).
+_CLIENT_CLASSES = {"ZhipuAiClient", "ZhipuAI"}
 
 _CALL_PATTERNS: list[tuple[list[str], CallType]] = [
-    (["messages", "create"], CallType.CHAT_COMPLETION),
-    (["messages", "stream"], CallType.CHAT_COMPLETION),
+    (["chat", "completions", "create"], CallType.CHAT_COMPLETION),
+    (["embeddings", "create"], CallType.EMBEDDING),
+    (["images", "generations"], CallType.IMAGE_GENERATION),
 ]
 
 
-class AnthropicDetector(BaseDetector):
+class ZhipuDetector(BaseDetector):
     def sdk_name(self) -> str:
-        return "anthropic"
+        return "zai"
 
     def can_handle(self, tree: ast.Module, source: str) -> bool:
-        if find_imports(tree, "anthropic"):
+        if find_imports(tree, "zai") or find_imports(tree, "zhipuai"):
             return True
-        if find_imports_by_name(tree, _CLIENT_CLASSES | {"anthropic"}):
+        if find_imports_by_name(tree, _CLIENT_CLASSES):
             return True
         return has_constructor_call(tree, _CLIENT_CLASSES)
 
@@ -64,32 +65,27 @@ class AnthropicDetector(BaseDetector):
 
             model_node = get_keyword_value(node, "model")
             model = resolve_string(model_node, variables, call=node, kwarg_name="model")
+            model_is_literal = (
+                model_node is not None and extract_string_literal(model_node) is not None
+            )
 
             max_tokens_node = get_keyword_value(node, "max_tokens")
             max_tokens = resolve_int(max_tokens_node, variables, call=node, kwarg_name="max_tokens")
 
             est_input = None
-            messages_node = get_keyword_value(node, "messages")
-            if messages_node:
-                est_input = estimate_tokens_from_messages(messages_node, model)
-
-            system_node = get_keyword_value(node, "system")
-            if system_node:
-                s = extract_string_literal(system_node)
-                if s:
-                    system_tokens = estimate_tokens_from_string(s, model)
-                    est_input = (est_input or 0) + system_tokens
+            if call_type == CallType.CHAT_COMPLETION:
+                messages_node = get_keyword_value(node, "messages")
+                if messages_node:
+                    est_input = estimate_tokens_from_messages(messages_node, model)
 
             calls.append(
                 LLMCall(
                     file_path=file_path,
                     line_number=node.lineno,
-                    sdk="anthropic",
+                    sdk="zai",
                     call_type=call_type,
                     model=model,
-                    model_is_literal=(
-                        model_node is not None and extract_string_literal(model_node) is not None
-                    ),
+                    model_is_literal=model_is_literal,
                     max_tokens=max_tokens,
                     estimated_input_tokens=est_input,
                     estimated_output_tokens=max_tokens,
