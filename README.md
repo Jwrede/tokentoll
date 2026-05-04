@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: Jwrede/tokentoll@v0.5.0
+      - uses: Jwrede/tokentoll@v0.5.2
 ```
 
 ## What It Detects
