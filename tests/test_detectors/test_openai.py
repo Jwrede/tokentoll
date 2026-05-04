@@ -256,3 +256,18 @@ client.chat.completions.create(model="gpt-4o-mini", messages=[])
     assert len(calls) == 2
     models = {c.model for c in calls}
     assert models == {"gpt-4o", "gpt-4o-mini"}
+
+
+def test_zhipu_compatible_client_not_detected():
+    # Zhipu's ZhipuAiClient exposes an OpenAI-compatible interface
+    # but is not OpenAI. We must not misidentify it as openai.
+    source = """
+from zai import ZhipuAiClient
+class ZhipuChat:
+    def __init__(self):
+        self._client = ZhipuAiClient()
+    def call(self):
+        return self._client.chat.completions.create(model="glm-4", messages=[])
+"""
+    calls = _detect(source)
+    assert calls == []

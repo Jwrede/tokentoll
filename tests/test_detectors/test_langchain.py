@@ -53,3 +53,33 @@ openai.chat.completions.create(model="gpt-4o", messages=[])
     tree = ast.parse(source)
     d = LangChainDetector()
     assert not d.can_handle(tree, source)
+
+
+def test_azure_chat_openai_with_explicit_model_priced():
+    source = """
+from langchain_openai import AzureChatOpenAI
+llm = AzureChatOpenAI(deployment_name="my-deployment", model="gpt-4o", max_tokens=512)
+"""
+    calls = _detect(source)
+    assert len(calls) == 1
+    assert calls[0].model == "gpt-4o"
+
+
+def test_azure_chat_openai_without_model_skipped():
+    # AzureChatOpenAI(deployment_name=...) alone does not tell us which
+    # model is behind the deployment, so we can't price it. Skip.
+    source = """
+from langchain_openai import AzureChatOpenAI
+llm = AzureChatOpenAI(deployment_name="my-deployment", max_tokens=512)
+"""
+    calls = _detect(source)
+    assert calls == []
+
+
+def test_azure_chat_openai_with_azure_deployment_only_skipped():
+    source = """
+from langchain_openai import AzureChatOpenAI
+llm = AzureChatOpenAI(azure_deployment="my-deployment")
+"""
+    calls = _detect(source)
+    assert calls == []

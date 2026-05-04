@@ -31,7 +31,7 @@ class GoogleDetector(BaseDetector):
             return True
         if find_imports_by_name(tree, {"genai"}):
             return True
-        return "generate_content" in source
+        return False
 
     def detect(
         self,

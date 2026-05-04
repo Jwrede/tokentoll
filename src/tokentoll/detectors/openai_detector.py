@@ -38,7 +38,7 @@ class OpenAIDetector(BaseDetector):
             return True
         if find_imports_by_name(tree, _CLIENT_CLASSES | {"openai"}):
             return True
-        return "completions.create" in source or "embeddings.create" in source
+        return False
 
     def detect(
         self,

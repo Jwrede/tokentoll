@@ -61,3 +61,15 @@ await client.messages.create(model="claude-sonnet-4-20250514", max_tokens=256, m
 """
     calls = _detect(source)
     assert len(calls) == 1
+
+
+def test_compatible_client_without_anthropic_import_not_detected():
+    # Some SDKs expose an Anthropic-compatible .messages.create() method
+    # without being the Anthropic client. Don't misidentify them.
+    source = """
+from someotherclient import OtherClient
+client = OtherClient()
+client.messages.create(model="something", max_tokens=10, messages=[])
+"""
+    calls = _detect(source)
+    assert calls == []
