@@ -77,7 +77,7 @@ runs:
             --format=markdown 2>&1) || true
           if echo "${SCAN}" | grep -q "Est. Cost/Call"; then
             {
-              echo "## tokentoll -- Initial Scan"
+              echo "## tokentoll: Initial Scan"
               echo ""
               echo "Here's what tokentoll found in this project. Future PRs that change LLM calls will get a cost diff comment automatically."
               echo ""
