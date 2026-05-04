@@ -1,4 +1,4 @@
-name: "tokentoll"
+name: "tokentoll: LLM Cost Diff"
 description: "Catch LLM cost changes in code review. Infracost for LLM spend."
 branding:
   icon: "dollar-sign"
