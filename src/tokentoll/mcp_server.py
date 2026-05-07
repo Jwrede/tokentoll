@@ -7,13 +7,14 @@ and compare LLM API costs from within an MCP-capable host.
 import json
 import subprocess
 import sys
-from typing import Optional
-
 from mcp.server.fastmcp import FastMCP
 
 server = FastMCP(
     "tokentoll",
-    instructions="Catch LLM cost changes in code review. Scan for LLM API calls and estimate costs.",
+    instructions=(
+        "Catch LLM cost changes in code review."
+        " Scan for LLM API calls and estimate costs."
+    ),
 )
 
 
@@ -45,7 +46,7 @@ def _run_cli(args: list[str]) -> str:
 
 
 @server.tool()
-def scan(path: str = ".", calls_per_month: Optional[int] = None) -> str:
+def scan(path: str = ".", calls_per_month: int | None = None) -> str:
     """Scan a directory for LLM API calls and estimate monthly costs.
 
     Finds all LLM API call sites (OpenAI, Anthropic, etc.) in the given
