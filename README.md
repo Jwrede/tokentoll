@@ -7,6 +7,7 @@
 [![GitHub Marketplace](https://img.shields.io/badge/marketplace-tokentoll-blue?logo=github)](https://github.com/marketplace/actions/tokentoll-llm-cost-diff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/score.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
 
 A CLI tool and GitHub Action that statically analyzes your code for LLM API calls,
 estimates their cost, and shows you the cost impact of every change in your
@@ -169,6 +170,8 @@ tokentoll update    # Update bundled pricing data
 ```
 
 ## MCP Server
+
+[![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/card.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
 
 tokentoll includes an MCP (Model Context Protocol) server that lets Claude Code
 and other MCP hosts check the cost impact of LLM code changes directly from an
