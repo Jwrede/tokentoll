@@ -13,8 +13,7 @@ from mcp.server.fastmcp import FastMCP
 server = FastMCP(
     "tokentoll",
     instructions=(
-        "Catch LLM cost changes in code review."
-        " Scan for LLM API calls and estimate costs."
+        "Catch LLM cost changes in code review. Scan for LLM API calls and estimate costs."
     ),
 )
 
@@ -37,11 +36,13 @@ def _run_cli(args: list[str]) -> str:
 
     if result.returncode != 0:
         error_detail = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-        return json.dumps({
-            "error": True,
-            "returncode": result.returncode,
-            "message": error_detail,
-        })
+        return json.dumps(
+            {
+                "error": True,
+                "returncode": result.returncode,
+                "message": error_detail,
+            }
+        )
 
     return result.stdout
 
