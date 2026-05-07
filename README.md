@@ -168,6 +168,40 @@ tokentoll diff [REF] [--base REF] [--head REF] [--format table|json|markdown|git
 tokentoll update    # Update bundled pricing data
 ```
 
+## MCP Server
+
+tokentoll includes an MCP (Model Context Protocol) server that lets Claude Code
+and other MCP hosts check the cost impact of LLM code changes directly from an
+agent conversation.
+
+### Install
+
+```bash
+pip install tokentoll[mcp]
+```
+
+### Register with Claude Code
+
+```bash
+claude mcp add --transport stdio tokentoll -- tokentoll-mcp
+```
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `scan` | Find LLM API calls in a directory and estimate monthly costs. Accepts a path and optional `calls_per_month`. |
+| `diff` | Compare LLM costs between two git refs. Accepts `base_ref` and optional `head_ref` (defaults to HEAD). |
+
+Both tools return JSON output.
+
+### Example use case
+
+Claude Code can check the cost impact of its own changes before committing.
+For example, after swapping a model from `gpt-4o` to `gpt-4o-mini`, the agent
+can call the `diff` tool against `HEAD` to verify the cost reduction before
+creating the commit.
+
 ## Pricing Data
 
 Pricing is bundled and works offline. To update to the latest prices:
@@ -220,10 +254,15 @@ calls_per_month: 5000
 # silence over a guess.
 skip_dynamic_models: false
 
+# Exclude paths from scanning (prefix match or glob pattern)
+exclude:
+  - tests/
+  - examples/
+  - docs/
+  - "*_test.py"
+
 # Per-path overrides (longest prefix match)
 overrides:
-  - path: tests/
-    calls_per_month: 100
   - path: src/agents/
     default_model: gpt-4o
     calls_per_month: 10000
@@ -274,14 +313,23 @@ client.chat.completions.create(**kwargs)
 - Dict literal and subscript contents
 - `**kwargs` unpacking
 
+## Roadmap
+
+- **Context-aware call frequency** (planned): infer calls/month from surrounding code
+  (FastAPI route handlers = high traffic, scripts = low, loops = multiplied) instead
+  of assuming uniform volume across all call sites.
+- **JS/TS support** (planned): detect LLM calls in JavaScript and TypeScript files.
+- **Cost alerts**: configurable thresholds that fail CI when a PR exceeds a cost delta.
+
 ## Limitations
 
 - Cannot resolve models loaded from external config files or databases at runtime.
   These calls use per-SDK defaults (configurable via `.tokentoll.yml`).
 - Token estimates use a characters/4 heuristic unless
   [tiktoken](https://github.com/openai/tiktoken) is installed.
-- Monthly estimates assume uniform call volume (configurable via `--calls-per-month`
-  or `.tokentoll.yml`).
+- Monthly estimates assume uniform call volume per call site (configurable via
+  `--calls-per-month`, `.tokentoll.yml`, or per-path overrides). Use the `exclude`
+  option to skip test and example files.
 - Python only for now (JS/TS support planned).
 
 ## License
