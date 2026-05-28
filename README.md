@@ -1,6 +1,6 @@
 # tokentoll
 
-> Catch LLM cost changes in code review. Infracost for LLM spend.
+> Prevent LLM cost regressions before production.
 
 [![CI](https://github.com/Jwrede/tokentoll/actions/workflows/ci.yml/badge.svg)](https://github.com/Jwrede/tokentoll/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/tokentoll)](https://pypi.org/project/tokentoll/)
@@ -9,24 +9,100 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/score.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
 
-A CLI tool and GitHub Action that statically analyzes your code for LLM API calls,
-estimates their cost, and shows you the cost impact of every change in your
-terminal or as a PR comment. Zero runtime dependencies.
+tokentoll is a CI gate for LLM cost. It statically analyzes Python (JS/TS planned) for LLM API calls, scores every pull request against a policy you control, and posts a PASS/WARN/FAIL verdict directly on the PR. Optionally, it fails the workflow when the policy is violated, so cost regressions cannot be merged.
 
 <p align="center">
   <img src="demo/demo.gif" alt="tokentoll demo" width="720">
 </p>
 
-## The Problem
+## The verdict comment
 
-A single model swap from `gpt-4o-mini` to `gpt-4o` increases costs **15x**.
-A new API call in a hot path can add **$10,000/month** to your bill.
-These changes hide in normal code review.
+When a PR violates your policy, tokentoll comments with a verdict and a blocking-findings list, then exits non-zero so the check fails. Example:
 
-tokentoll finds LLM API calls in your code, estimates their cost,
-and shows you the cost impact of every change before it hits production.
+```md
+## tokentoll verdict: FAIL
 
-## Quick Start
+**Blocking findings (2):**
+
+- `src/agent.py:42` - per-call cost grew 15.0x (threshold 5x)
+- total monthly delta +$812.00 exceeds budget $250.00
+
+> Required action: revert the regression, raise the threshold in `.tokentoll.yml`, or add an exemption.
+```
+
+When the PR is clean, the verdict is PASS and the comment shows only the cost delta table. When no policy is configured, tokentoll posts an informational delta comment with no verdict.
+
+## Quick start (60 seconds)
+
+Add `.github/workflows/tokentoll.yml`:
+
+```yaml
+name: tokentoll
+on:
+  pull_request:
+    paths:
+      - "**.py"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  cost-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Jwrede/tokentoll@v0.7.0
+        with:
+          fail-on-policy-violation: true
+```
+
+Then add `.tokentoll.yml` to your repo root:
+
+```yaml
+budgets:
+  max_monthly_delta_usd: 250
+  max_callsite_monthly_usd: 100
+  max_relative_increase: 5.0
+
+policies:
+  block_unknown_models: true
+  fail_on_policy_violation: true
+```
+
+Future PRs receive a verdict comment. PRs that exceed the thresholds fail the workflow.
+
+For SHA-pinned installs and minimal-permissions setups, see [docs/github-action.md](docs/github-action.md). For the full policy schema, see [docs/policy.md](docs/policy.md). For the security posture, see [docs/security.md](docs/security.md).
+
+## What it detects
+
+| SDK | Patterns | Status |
+|-----|----------|--------|
+| OpenAI | `chat.completions.create`, `responses.create` | Supported |
+| Anthropic | `messages.create`, `messages.stream` | Supported |
+| Google GenAI | `models.generate_content` | Supported |
+| LiteLLM | `completion`, `acompletion` | Supported |
+| LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
+| Zhipu AI | `ZhipuAiClient`, `ZhipuAI` (GLM models) | Supported |
+| JS/TS SDKs | OpenAI Node, Anthropic, Vercel AI SDK, LangChain.js | Planned (v0.8) |
+
+## Policy rules
+
+The policy block in `.tokentoll.yml` controls when a PR fails:
+
+| Rule | Trigger |
+|------|---------|
+| `budgets.max_monthly_delta_usd` | total estimated monthly delta exceeds the threshold |
+| `budgets.max_callsite_monthly_usd` | any new or changed call site exceeds the threshold |
+| `budgets.max_relative_increase` | per-call cost for any modified call site grows by more than this multiplier |
+| `policies.block_unknown_models` | any new or modified call site uses an unpriced or unresolved model |
+| `policies.fail_on_policy_violation` | `tokentoll diff` exits 1 on FAIL (CI gate behavior) |
+
+Each rule is independent. Leave a field unset to disable that rule. Full reference in [docs/policy.md](docs/policy.md).
+
+## CLI
 
 ```bash
 pip install tokentoll
@@ -37,232 +113,44 @@ tokentoll scan .
 # Show cost impact of your last commit
 tokentoll diff HEAD~1
 
-# Compare two branches
-tokentoll diff main..feature-branch
+# Compare two refs and fail on policy violation
+tokentoll diff main..HEAD --fail-on-policy-violation
 ```
 
-## GitHub Action
-
-```yaml
-name: LLM Cost Diff
-on:
-  pull_request:
-    paths:
-      - "**.py"
-
-permissions:
-  pull-requests: write
-
-jobs:
-  cost-diff:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: Jwrede/tokentoll@v0.6.1
-```
-
-## What It Detects
-
-| SDK | Patterns | Status |
-|-----|----------|--------|
-| OpenAI | `chat.completions.create`, `responses.create` | Supported |
-| Anthropic | `messages.create`, `messages.stream` | Supported |
-| Google GenAI | `models.generate_content` | Supported |
-| LiteLLM | `completion`, `acompletion` | Supported |
-| LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
-| Zhipu AI | `ZhipuAiClient`, `ZhipuAI` (GLM models) | Supported |
-| JS/TS SDKs | | Planned |
-
-## Example Output
-
-### `tokentoll scan`
-
-```
-LLM API Calls Detected
-============================================================
-
-File: src/agents/summarizer.py
-  Line 42: openai client.chat.completions.create
-           Model: gpt-4o | Max tokens: 4096
-           Est. cost/call: $0.03 | Monthly (1000 calls/month per call site): $26.50
-
-  Line 78: openai client.chat.completions.create
-           Model: gpt-4o-mini | Max tokens: 1000
-           Est. cost/call: $0.000301 | Monthly (1000 calls/month per call site): $0.30
-
---
-Total estimated monthly cost: $26.80
-  1000 calls/month per call site
-```
-
-### `tokentoll diff`
-
-```
-LLM Cost Diff: main..feature-branch
-============================================================
-
-+ ADDED    src/agents/rewriter.py:35
-           openai | Model: gpt-4o
-           Est. cost/call: $0.03 | Monthly: +$26.50
-
-~ MODIFIED src/agents/summarizer.py:42
-           openai | Model: gpt-4o -> gpt-4o-mini
-           Est. cost/call: $0.03 -> $0.000301 | Monthly: -$26.20
-
---
-Monthly cost impact: +$0.30
-  Added: 1 | Changed: 1 | Removed: 0
-  1000 calls/month per call site
-```
-
-## How It Works
-
-```
-  Source Code (.py files)
-         |
-         v
-  +-------------+     +------------------+
-  | AST Scanner |---->| SDK Detectors    |
-  | (ast.parse) |     | OpenAI, Anthropic|
-  +-------------+     | Google, LiteLLM  |
-                       | LangChain        |
-                       +------------------+
-                              |
-                              v
-                       +------------------+
-                       | Pricing Engine   |
-                       | 2200+ models     |
-                       | Auto-cached      |
-                       +------------------+
-                              |
-                  +-----------+-----------+
-                  |                       |
-                  v                       v
-           +------------+         +-------------+
-           | Scan Report|         | Diff Engine  |
-           | (costs)    |         | (old vs new) |
-           +------------+         +-------------+
-                  |                       |
-                  v                       v
-           +------------+         +-------------+
-           | Table/JSON |         | Table/JSON/  |
-           |            |         | PR Comment   |
-           +------------+         +-------------+
-```
-
-1. Parses Python files using the `ast` module to find LLM API calls
-2. Multi-pass constant propagation resolves model names through variables,
-   `os.getenv()` fallbacks, class attributes, constructor args, dict contents,
-   and `**kwargs` unpacking
-3. Looks up pricing from a local cache (sourced from LiteLLM, 2200+ models)
-4. For diff mode: compares calls between two git refs and computes the cost delta
-5. Outputs a cost report as a table, JSON, or GitHub PR comment
-
-## CLI Reference
+Subcommands:
 
 ```
 tokentoll scan [PATH...] [--format table|json|markdown] [--calls-per-month N] [--config PATH]
-tokentoll diff [REF] [--base REF] [--head REF] [--format table|json|markdown|github-comment] [--config PATH]
-tokentoll update    # Update bundled pricing data
+tokentoll diff [REF] [--base REF] [--head REF] [--format table|json|markdown|github-comment]
+               [--config PATH] [--fail-on-policy-violation]
+tokentoll update    # refresh bundled pricing data from LiteLLM
 ```
-
-## MCP Server
-
-[![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/card.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
-
-tokentoll includes an MCP (Model Context Protocol) server that lets Claude Code
-and other MCP hosts check the cost impact of LLM code changes directly from an
-agent conversation.
-
-### Install
-
-```bash
-pip install tokentoll[mcp]
-```
-
-### Register with Claude Code
-
-```bash
-claude mcp add --transport stdio tokentoll -- tokentoll-mcp
-```
-
-### Tools
-
-| Tool | Description |
-|------|-------------|
-| `scan` | Find LLM API calls in a directory and estimate monthly costs. Accepts a path and optional `calls_per_month`. |
-| `diff` | Compare LLM costs between two git refs. Accepts `base_ref` and optional `head_ref` (defaults to HEAD). |
-
-Both tools return JSON output.
-
-### Example use case
-
-Claude Code can check the cost impact of its own changes before committing.
-For example, after swapping a model from `gpt-4o` to `gpt-4o-mini`, the agent
-can call the `diff` tool against `HEAD` to verify the cost reduction before
-creating the commit.
-
-## Pricing Data
-
-Pricing is bundled and works offline. To update to the latest prices:
-
-```bash
-tokentoll update
-```
-
-Pricing data is sourced from LiteLLM's `model_prices_and_context_window.json`
-and covers 300+ models across OpenAI, Anthropic, Google, AWS Bedrock,
-Azure, and more.
-
-## Dynamic Model Defaults
-
-When tokentoll encounters a call where the model name is a variable it cannot resolve,
-it applies a sensible per-SDK default so you still get cost estimates:
-
-| SDK | Default Model |
-|-----|---------------|
-| OpenAI | `gpt-4o` |
-| Anthropic | `claude-sonnet-4-20250514` |
-| Google GenAI | `gemini-2.0-flash` |
-| LiteLLM | `gpt-4o` |
-| LangChain | `gpt-4o` |
-| Zhipu AI | `zai/glm-4.6` |
-
-These defaults are shown as `gpt-4o (default)` in scan output. You can override
-them per-project or per-path using a `.tokentoll.yml` config file (see below).
 
 ## Configuration
 
-Create a `.tokentoll.yml` in your project root to customize behavior.
-tokentoll automatically finds this file by walking up from the scanned directory.
+`.tokentoll.yml` lives in the repo root and is auto-discovered. Beyond the policy block:
 
 ```yaml
-# Default model for all dynamic (unresolved) calls
-default_model: gpt-4o
-
-# Per-SDK defaults (override the built-in defaults above)
+# Per-SDK defaults for dynamic (runtime-resolved) model names
 default_models:
   openai: gpt-4o-mini
   anthropic: claude-haiku-3-20240307
 
-# Assumed calls per month per call site
+# Assumed monthly call volume per call site (used for dollar estimates)
 calls_per_month: 5000
 
-# Skip cost estimation entirely for dynamic (unresolved) models. When true,
-# calls whose model name cannot be resolved statically are reported with no
-# cost rather than priced against a default. Useful for projects that prefer
-# silence over a guess.
+# Skip cost estimation for dynamic models entirely.
+# Default false: dynamic calls are priced against the per-SDK default.
 skip_dynamic_models: false
 
-# Exclude paths from scanning (prefix match or glob pattern)
+# Default excludes (tests/, examples/, docs/, cookbook/, benchmarks/, evals/,
+# scripts/, notebooks/) are applied automatically. Opt out with:
+use_default_excludes: false
+
+# Additional excludes (prefix or glob)
 exclude:
-  - tests/
-  - examples/
-  - docs/
   - "*_test.py"
+  - vendor/
 
 # Per-path overrides (longest prefix match)
 overrides:
@@ -273,67 +161,87 @@ overrides:
     skip_dynamic_models: true
 ```
 
-Resolution order for dynamic model defaults: per-SDK config (`default_models`) >
-generic config (`default_model`) > built-in SDK defaults.
+Resolution order for dynamic model defaults: `default_models` (per-SDK) > `default_model` (generic) > built-in SDK defaults.
 
-You can also pass `--config path/to/.tokentoll.yml` to use a specific config file.
+## Security
 
-## Token Estimation
+tokentoll requires no API keys, sends no telemetry, and runs entirely inside your CI environment. Pricing data ships with the package and updates from LiteLLM on demand. For the recommended permission set, SHA pinning, and fork PR risk, see [docs/security.md](docs/security.md).
 
-By default, tokentoll estimates token counts using a characters/4 heuristic.
-For more accurate estimates, install [tiktoken](https://github.com/openai/tiktoken):
+## MCP server
+
+[![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/card.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
+
+tokentoll ships an MCP (Model Context Protocol) server so Claude Code and other MCP hosts can check the cost impact of LLM code changes from inside an agent conversation:
 
 ```bash
-pip install tiktoken
+pip install tokentoll[mcp]
+claude mcp add --transport stdio tokentoll -- tokentoll-mcp
 ```
 
-When tiktoken is available, tokentoll uses the correct tokenizer encoding for
-each model. Unknown models fall back to `cl100k_base`. Tiktoken is lazy-loaded
-and encoders are cached, so there is no startup penalty if you don't need it.
+Two tools are exposed: `scan` (estimate costs across a path) and `diff` (compare two refs). Both return JSON.
 
-## Smart Variable Resolution
+## How it works
 
-Real codebases rarely pass model names as string literals. tokentoll's multi-pass
-constant propagation engine follows:
-
-```python
-DEFAULT_MODEL = os.getenv("MODEL", "gpt-4o")
-
-class Config:
-    model: str = DEFAULT_MODEL
-
-config = Config()
-kwargs = {"model": config.model, "max_tokens": 2000}
-client.chat.completions.create(**kwargs)
-# tokentoll resolves: model="gpt-4o", max_tokens=2000
+```
+  Source code (.py)
+        |
+        v
+  +-------------+     +------------------+
+  | AST scanner |---->| SDK detectors    |
+  | (ast.parse) |     | OpenAI, Anthropic|
+  +-------------+     | Google, LiteLLM, |
+                       | LangChain, Zhipu |
+                       +------------------+
+                              |
+                              v
+                       +------------------+
+                       | Pricing engine   |
+                       | 2200+ models     |
+                       +------------------+
+                              |
+                              v
+                       +------------------+
+                       | Diff engine      |
+                       | (old vs new)     |
+                       +------------------+
+                              |
+                              v
+                       +------------------+
+                       | Policy evaluator |
+                       | PASS/WARN/FAIL   |
+                       +------------------+
+                              |
+                              v
+                       +------------------+
+                       | PR comment / CLI |
+                       | output           |
+                       +------------------+
 ```
 
-- Variable assignments (`MODEL = "gpt-4o"`)
-- `os.getenv()` / `os.environ.get()` fallback values
-- Function default parameters
-- Class attribute defaults
-- Constructor argument propagation
-- Dict literal and subscript contents
-- `**kwargs` unpacking
+A multi-pass constant propagation engine resolves model names through variable assignments, `os.getenv()` fallbacks, function defaults, class attributes, constructor arguments, dict literals, and `**kwargs` unpacking, so real-world code with indirection still produces useful estimates.
 
-## Roadmap
+## Pricing data
 
-- **Context-aware call frequency** (planned): infer calls/month from surrounding code
-  (FastAPI route handlers = high traffic, scripts = low, loops = multiplied) instead
-  of assuming uniform volume across all call sites.
-- **JS/TS support** (planned): detect LLM calls in JavaScript and TypeScript files.
-- **Cost alerts**: configurable thresholds that fail CI when a PR exceeds a cost delta.
+Pricing is bundled and works offline. To refresh from LiteLLM:
+
+```bash
+tokentoll update
+```
+
+Coverage: 300+ models across OpenAI, Anthropic, Google, AWS Bedrock, Azure, and more, plus 2200+ entries from LiteLLM's combined catalog.
 
 ## Limitations
 
-- Cannot resolve models loaded from external config files or databases at runtime.
-  These calls use per-SDK defaults (configurable via `.tokentoll.yml`).
-- Token estimates use a characters/4 heuristic unless
-  [tiktoken](https://github.com/openai/tiktoken) is installed.
-- Monthly estimates assume uniform call volume per call site (configurable via
-  `--calls-per-month`, `.tokentoll.yml`, or per-path overrides). Use the `exclude`
-  option to skip test and example files.
-- Python only for now (JS/TS support planned).
+- Static analysis only. Models loaded from databases or remote config cannot be resolved; tokentoll falls back to the configured per-SDK default and marks the call site as `(default)`.
+- Token estimates use a characters/4 heuristic unless [tiktoken](https://github.com/openai/tiktoken) is installed (`pip install tokentoll[tiktoken]`).
+- Monthly estimates assume uniform call volume per call site. Override per-project with `calls_per_month` or per-path with `overrides`.
+- Python only in v0.7. JS/TS support is the focus of v0.8.
+
+## Roadmap
+
+- **v0.8**: JS/TS support (OpenAI Node SDK, Anthropic, Vercel AI SDK, LangChain.js) via tree-sitter
+- **v0.9**: Public demo repo with a known-failing PR, gpt-researcher case study, expanded adoption section
+- **Future**: Context-aware call frequency inference (FastAPI routes versus scripts versus loops)
 
 ## License
 
