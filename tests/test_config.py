@@ -5,6 +5,7 @@ from tokentoll.config import (
     PathOverride,
     ProjectConfig,
     _parse_simple_yaml,
+    is_excluded,
     load_config,
     resolve_for_path,
 )
@@ -196,3 +197,113 @@ def test_resolve_for_path_skip_dynamic_models_disabled_by_override():
     )
     resolved = resolve_for_path(config, "src/loose/file.py")
     assert resolved.skip_dynamic_models is False
+
+
+def test_parse_yaml_exclude_list():
+    text = """
+exclude:
+  - tests/
+  - examples/
+  - docs/
+"""
+    data = _parse_simple_yaml(text)
+    assert data["exclude"] == ["tests/", "examples/", "docs/"]
+
+
+def test_load_config_exclude():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / ".tokentoll.yml"
+        config_path.write_text("exclude:\n  - tests/\n  - examples/\n")
+        config = load_config(Path(tmpdir))
+        assert config.exclude == ["tests/", "examples/"]
+
+
+def test_is_excluded_prefix_match():
+    config = ProjectConfig(exclude=["tests/", "examples/"])
+    assert is_excluded(config, "tests/test_main.py") is True
+    assert is_excluded(config, "tests/deep/nested.py") is True
+    assert is_excluded(config, "examples/demo.py") is True
+    assert is_excluded(config, "src/main.py") is False
+
+
+def test_is_excluded_glob_match():
+    config = ProjectConfig(exclude=["*_test.py", "test_*"])
+    assert is_excluded(config, "src/handler_test.py") is True
+    assert is_excluded(config, "test_utils.py") is True
+    assert is_excluded(config, "src/handler.py") is False
+
+
+def test_is_excluded_with_project_root():
+    config = ProjectConfig(
+        exclude=["tests/"],
+        project_root="/home/user/project",
+    )
+    assert is_excluded(config, "/home/user/project/tests/test_main.py") is True
+    assert is_excluded(config, "/home/user/project/src/main.py") is False
+
+
+def test_is_excluded_nested_component_match():
+    config = ProjectConfig(exclude=["tests/", "examples/"])
+    assert is_excluded(config, "python/tests/test_main.py") is True
+    assert is_excluded(config, "src/pkg/examples/demo.py") is True
+    assert is_excluded(config, "src/pkg/main.py") is False
+
+
+def test_is_excluded_empty():
+    config = ProjectConfig(exclude=[], use_default_excludes=False)
+    assert is_excluded(config, "tests/test_main.py") is False
+
+
+def test_default_excludes_apply_with_no_user_config():
+    config = ProjectConfig()
+    assert is_excluded(config, "tests/test_main.py") is True
+    assert is_excluded(config, "examples/demo.py") is True
+    assert is_excluded(config, "docs/conf.py") is True
+    assert is_excluded(config, "cookbook/snippet.py") is True
+    assert is_excluded(config, "evals/run.py") is True
+    assert is_excluded(config, "scripts/migrate.py") is True
+    assert is_excluded(config, "src/main.py") is False
+
+
+def test_default_excludes_match_nested_paths():
+    config = ProjectConfig()
+    assert is_excluded(config, "python/tests/test_main.py") is True
+    assert is_excluded(config, "src/pkg/examples/demo.py") is True
+
+
+def test_use_default_excludes_false_disables_defaults():
+    config = ProjectConfig(use_default_excludes=False)
+    assert is_excluded(config, "tests/test_main.py") is False
+    assert is_excluded(config, "examples/demo.py") is False
+
+
+def test_use_default_excludes_false_keeps_user_excludes():
+    config = ProjectConfig(
+        exclude=["internal/"],
+        use_default_excludes=False,
+    )
+    assert is_excluded(config, "internal/foo.py") is True
+    assert is_excluded(config, "tests/test_main.py") is False
+
+
+def test_user_excludes_merge_with_defaults():
+    config = ProjectConfig(exclude=["vendor/", "generated/"])
+    assert is_excluded(config, "tests/test_main.py") is True
+    assert is_excluded(config, "vendor/lib.py") is True
+    assert is_excluded(config, "generated/code.py") is True
+    assert is_excluded(config, "src/main.py") is False
+
+
+def test_load_config_use_default_excludes_false():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / ".tokentoll.yml"
+        config_path.write_text("use_default_excludes: false\n")
+        config = load_config(Path(tmpdir))
+        assert config.use_default_excludes is False
+        assert is_excluded(config, "tests/test_main.py") is False
+
+
+def test_load_config_default_excludes_on_by_default():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = load_config(Path(tmpdir))
+        assert config.use_default_excludes is True

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tokentoll.config import ProjectConfig, load_config, resolve_for_path
+from tokentoll.config import ProjectConfig, is_excluded, load_config, resolve_for_path
 from tokentoll.core.models import (
     ChangeType,
     CostEstimate,
@@ -46,6 +46,8 @@ def run_scan(
 
     estimates = []
     for call in calls:
+        if is_excluded(config, call.file_path):
+            continue
         resolved = resolve_for_path(config, call.file_path)
         cpm = calls_per_month or resolved.calls_per_month or effective_cpm
         estimates.append(
@@ -118,6 +120,9 @@ def run_diff_command(
     new_calls_map: dict[str, list] = {}
 
     for fpath, status in changed_files:
+        if is_excluded(config, fpath):
+            continue
+
         if status != "D":
             source = get_file_at_ref(head_ref, fpath)
             if source:

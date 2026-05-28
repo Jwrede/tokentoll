@@ -69,22 +69,17 @@ runs:
           echo "${COMMENT}" > /tmp/tokentoll-comment.md
         fi
 
-        # First run: this PR adds tokentoll to the project.
+        # First-install PR: confirm install without posting a noisy whole-repo baseline.
         ADDS_TOKENTOLL=$(git diff "${INPUT_BASE_REF}" "${INPUT_HEAD_REF}" 2>/dev/null | grep -q "^+.*Jwrede/tokentoll" && echo true || echo false)
         if [ "${HAS_CHANGES}" = "false" ] && [ "${ADDS_TOKENTOLL}" = "true" ]; then
-          SCAN=$(tokentoll scan . \
-            --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
-            --format=markdown 2>&1) || true
-          if echo "${SCAN}" | grep -q "Est. Cost/Call"; then
-            {
-              echo "## tokentoll: Initial Scan"
-              echo ""
-              echo "Here's what tokentoll found in this project. Future PRs that change LLM calls will get a cost diff comment automatically."
-              echo ""
-              echo "${SCAN}" | tail -n +2
-            } > /tmp/tokentoll-comment.md
-            echo "has-changes=true" >> "$GITHUB_OUTPUT"
-          fi
+          {
+            echo "## tokentoll installed"
+            echo ""
+            echo "Future PRs that add, remove, or change LLM API calls will receive an automatic cost-delta comment on this thread."
+            echo ""
+            echo "No baseline monthly estimate is posted on install because runtime traffic cannot be inferred from static analysis. To enable dollar estimates per call site, add a [.tokentoll.yml](https://github.com/Jwrede/tokentoll#configuration) with traffic assumptions."
+          } > /tmp/tokentoll-comment.md
+          echo "has-changes=true" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Post PR comment
