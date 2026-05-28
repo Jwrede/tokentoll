@@ -13,7 +13,7 @@ from tokentoll.core.models import (
 )
 from tokentoll.core.policy import evaluate_policy
 from tokentoll.pricing.engine import PricingEngine
-from tokentoll.scanner.python_scanner import scan_paths, scan_source
+from tokentoll.scanner import scan_paths, scan_source
 
 
 def _build_scan_report(

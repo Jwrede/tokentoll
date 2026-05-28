@@ -10,6 +10,10 @@ on:
   pull_request:
     paths:
       - "**.py"
+      - "**.ts"
+      - "**.tsx"
+      - "**.js"
+      - "**.jsx"
 
 permissions:
   contents: read

@@ -9,7 +9,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![tokentoll MCP server](https://glama.ai/mcp/servers/Jwrede/tokentoll/badges/score.svg)](https://glama.ai/mcp/servers/Jwrede/tokentoll)
 
-tokentoll is a CI gate for LLM cost. It statically analyzes Python (JS/TS planned) for LLM API calls, scores every pull request against a policy you control, and posts a PASS/WARN/FAIL verdict directly on the PR. Optionally, it fails the workflow when the policy is violated, so cost regressions cannot be merged.
+tokentoll is a CI gate for LLM cost. It statically analyzes Python, JavaScript, and TypeScript for LLM API calls, scores every pull request against a policy you control, and posts a PASS/WARN/FAIL verdict directly on the PR. Optionally, it fails the workflow when the policy is violated, so cost regressions cannot be merged.
 
 <p align="center">
   <img src="demo/demo.gif" alt="tokentoll demo" width="720">
@@ -42,6 +42,10 @@ on:
   pull_request:
     paths:
       - "**.py"
+      - "**.ts"
+      - "**.tsx"
+      - "**.js"
+      - "**.jsx"
 
 permissions:
   contents: read
@@ -78,15 +82,26 @@ For SHA-pinned installs and minimal-permissions setups, see [docs/github-action.
 
 ## What it detects
 
-| SDK | Patterns | Status |
-|-----|----------|--------|
-| OpenAI | `chat.completions.create`, `responses.create` | Supported |
-| Anthropic | `messages.create`, `messages.stream` | Supported |
-| Google GenAI | `models.generate_content` | Supported |
-| LiteLLM | `completion`, `acompletion` | Supported |
-| LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` | Supported |
-| Zhipu AI | `ZhipuAiClient`, `ZhipuAI` (GLM models) | Supported |
-| JS/TS SDKs | OpenAI Node, Anthropic, Vercel AI SDK, LangChain.js | Planned (v0.8) |
+**Python**
+
+| SDK | Patterns |
+|-----|----------|
+| OpenAI | `chat.completions.create`, `responses.create` |
+| Anthropic | `messages.create`, `messages.stream` |
+| Google GenAI | `models.generate_content` |
+| LiteLLM | `completion`, `acompletion` |
+| LangChain | `ChatOpenAI`, `ChatAnthropic`, `init_chat_model` |
+| Zhipu AI | `ZhipuAiClient`, `ZhipuAI` (GLM models) |
+
+**JavaScript / TypeScript** (parsed via tree-sitter, handles `.js`, `.jsx`, `.ts`, `.tsx`)
+
+| SDK | Patterns |
+|-----|----------|
+| OpenAI Node SDK | `client.chat.completions.create`, `client.responses.create`, `client.embeddings.create` |
+| Anthropic SDK | `client.messages.create`, `client.messages.stream` |
+| Vercel AI SDK | `generateText`, `streamText`, `generateObject`, `streamObject`, `embed`, `embedMany` |
+| LangChain.js | `new ChatOpenAI`, `new ChatAnthropic`, `new ChatGoogleGenerativeAI`, ... |
+| OpenAI-compatible | same shape as OpenAI Node SDK, picked up automatically |
 
 ## Policy rules
 
@@ -183,14 +198,15 @@ Two tools are exposed: `scan` (estimate costs across a path) and `diff` (compare
 ## How it works
 
 ```
-  Source code (.py)
+  Source code (.py, .ts, .tsx, .js, .jsx)
         |
         v
-  +-------------+     +------------------+
-  | AST scanner |---->| SDK detectors    |
-  | (ast.parse) |     | OpenAI, Anthropic|
-  +-------------+     | Google, LiteLLM, |
-                       | LangChain, Zhipu |
+  +----------------+   +------------------+
+  | AST scanners   |-->| SDK detectors    |
+  | ast (Python) + |   | OpenAI, Anthropic|
+  | tree-sitter    |   | Google, LiteLLM, |
+  | (JS/TS)        |   | LangChain, Zhipu,|
+  +----------------+   | Vercel AI SDK    |
                        +------------------+
                               |
                               v
@@ -218,7 +234,7 @@ Two tools are exposed: `scan` (estimate costs across a path) and `diff` (compare
                        +------------------+
 ```
 
-A multi-pass constant propagation engine resolves model names through variable assignments, `os.getenv()` fallbacks, function defaults, class attributes, constructor arguments, dict literals, and `**kwargs` unpacking, so real-world code with indirection still produces useful estimates.
+A multi-pass constant propagation engine resolves model names through variable assignments, `os.getenv()` / `process.env.X` fallbacks, function defaults, class attributes, constructor arguments, dict and object literals, `**kwargs` unpacking, and Vercel AI SDK provider wrappers (`openai("gpt-4o")`), so real-world code with indirection still produces useful estimates.
 
 ## Pricing data
 
@@ -235,13 +251,12 @@ Coverage: 300+ models across OpenAI, Anthropic, Google, AWS Bedrock, Azure, and 
 - Static analysis only. Models loaded from databases or remote config cannot be resolved; tokentoll falls back to the configured per-SDK default and marks the call site as `(default)`.
 - Token estimates use a characters/4 heuristic unless [tiktoken](https://github.com/openai/tiktoken) is installed (`pip install tokentoll[tiktoken]`).
 - Monthly estimates assume uniform call volume per call site. Override per-project with `calls_per_month` or per-path with `overrides`.
-- Python only in v0.7. JS/TS support is the focus of v0.8.
+- JS/TS resolution is same-file only. Importing a model name from another module produces a dynamic call site rather than a resolved value.
 
 ## Roadmap
 
-- **v0.8**: JS/TS support (OpenAI Node SDK, Anthropic, Vercel AI SDK, LangChain.js) via tree-sitter
 - **v0.9**: Public demo repo with a known-failing PR, gpt-researcher case study, expanded adoption section
-- **Future**: Context-aware call frequency inference (FastAPI routes versus scripts versus loops)
+- **Future**: Context-aware call frequency inference (FastAPI routes versus scripts versus loops); cross-file import resolution for JS/TS
 
 ## License
 

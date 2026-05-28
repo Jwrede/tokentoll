@@ -1,6 +1,6 @@
 [project]
 name = "tokentoll"
-version = "0.7.0"
+version = "0.8.0"
 description = "Catch LLM cost changes in code review. Infracost for LLM spend."
 readme = "README.md"
 license = {text = "MIT"}
@@ -18,7 +18,11 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 
-dependencies = []
+dependencies = [
+    "tree-sitter>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-javascript>=0.23",
+]
 
 [project.optional-dependencies]
 tiktoken = ["tiktoken>=0.5.0"]
