@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tokentoll.core.models import CostEstimate, DiffReport, ScanReport
+from tokentoll.core.models import CostEstimate, DiffReport, ScanReport, Verdict
 
 
 def _estimate_to_dict(est: CostEstimate) -> dict:
@@ -31,7 +31,7 @@ def format_scan_report_json(report: ScanReport) -> dict:
     }
 
 
-def format_diff_report_json(report: DiffReport) -> dict:
+def format_diff_report_json(report: DiffReport, verdict: Verdict | None = None) -> dict:
     diffs = []
     for d in report.call_diffs:
         if d.change_type.value == "unchanged":
@@ -57,7 +57,7 @@ def format_diff_report_json(report: DiffReport) -> dict:
             }
         diffs.append(entry)
 
-    return {
+    out: dict = {
         "base_ref": report.base_ref,
         "head_ref": report.head_ref,
         "diffs": diffs,
@@ -68,3 +68,20 @@ def format_diff_report_json(report: DiffReport) -> dict:
         "assumptions": report.assumptions,
         "warnings": report.warnings,
     }
+
+    if verdict is not None:
+        out["verdict"] = {
+            "level": verdict.level.value,
+            "findings": [
+                {
+                    "severity": f.severity.value,
+                    "rule": f.rule,
+                    "message": f.message,
+                    "file_path": f.file_path,
+                    "line_number": f.line_number,
+                }
+                for f in verdict.findings
+            ],
+        }
+
+    return out

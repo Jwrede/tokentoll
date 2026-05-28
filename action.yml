@@ -23,11 +23,18 @@ inputs:
     description: "Python version to use"
     required: false
     default: "3.11"
+  fail-on-policy-violation:
+    description: "Fail the action if the configured policy fails (default: false)"
+    required: false
+    default: "false"
 
 outputs:
   monthly-delta:
     description: "Net monthly cost delta (positive = more expensive)"
     value: ${{ steps.run.outputs.monthly-delta }}
+  verdict:
+    description: "Policy verdict: pass, warn, or fail"
+    value: ${{ steps.run.outputs.verdict }}
 
 runs:
   using: "composite"
@@ -57,8 +64,10 @@ runs:
 
         DELTA=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_monthly_delta', 0))" 2>/dev/null) || DELTA=0
         HAS_CHANGES=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('diffs') else 'false')" 2>/dev/null) || HAS_CHANGES=false
+        VERDICT=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('verdict',{}).get('level','pass'))" 2>/dev/null) || VERDICT=pass
         echo "monthly-delta=${DELTA}" >> "$GITHUB_OUTPUT"
         echo "has-changes=${HAS_CHANGES}" >> "$GITHUB_OUTPUT"
+        echo "verdict=${VERDICT}" >> "$GITHUB_OUTPUT"
 
         if [ "${HAS_CHANGES}" = "true" ]; then
           COMMENT=$(tokentoll diff \
@@ -89,3 +98,10 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         header: tokentoll
         path: /tmp/tokentoll-comment.md
+
+    - name: Enforce policy verdict
+      if: always() && inputs.fail-on-policy-violation == 'true' && steps.run.outputs.verdict == 'fail'
+      shell: bash
+      run: |
+        echo "::error::tokentoll policy violation: see PR comment for blocking findings"
+        exit 1

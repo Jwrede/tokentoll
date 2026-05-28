@@ -98,3 +98,26 @@ class ScanReport:
     total_monthly_estimate: float | None = None
     warnings: list[str] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
+
+
+class VerdictLevel(Enum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+@dataclass
+class VerdictFinding:
+    """A single rule violation contributing to a verdict."""
+
+    severity: VerdictLevel
+    rule: str
+    message: str
+    file_path: str | None = None
+    line_number: int | None = None
+
+
+@dataclass
+class Verdict:
+    level: VerdictLevel
+    findings: list[VerdictFinding] = field(default_factory=list)

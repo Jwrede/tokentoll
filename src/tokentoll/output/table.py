@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from tokentoll.core.models import CostEstimate, DiffReport, ScanReport
+from tokentoll.core.models import CostEstimate, DiffReport, ScanReport, Verdict, VerdictLevel
 
 
 def _model_display(model: str | None, est: CostEstimate | None = None) -> str:
@@ -72,11 +72,27 @@ def print_scan_report(report: ScanReport) -> None:
         print(f"  Warning: {warning}", file=sys.stderr)
 
 
-def print_diff_report(report: DiffReport) -> None:
+def _print_verdict(verdict: Verdict | None) -> None:
+    if verdict is None:
+        return
+    if verdict.level == VerdictLevel.PASS and not verdict.findings:
+        return
+    label = verdict.level.value.upper()
+    print(f"tokentoll verdict: {label}")
+    print("-" * 60)
+    for f in verdict.findings:
+        loc = f"{f.file_path}:{f.line_number}  " if f.file_path and f.line_number else ""
+        print(f"  [{f.severity.value.upper()}] {loc}{f.message}")
+    print()
+
+
+def print_diff_report(report: DiffReport, verdict: Verdict | None = None) -> None:
     if not report.call_diffs:
+        _print_verdict(verdict)
         print("No LLM API call changes detected.")
         return
 
+    _print_verdict(verdict)
     print(f"LLM Cost Diff: {report.base_ref}..{report.head_ref}")
     print("=" * 60)
     print()

@@ -33,6 +33,40 @@ DEFAULT_EXCLUDES: tuple[str, ...] = (
 
 
 @dataclass
+class PolicyBudgets:
+    """Numeric thresholds that trigger FAIL findings when exceeded."""
+
+    max_monthly_delta_usd: float | None = None
+    max_callsite_monthly_usd: float | None = None
+    max_relative_increase: float | None = None
+
+
+@dataclass
+class PolicyRules:
+    """Boolean rules that trigger FAIL findings."""
+
+    block_unknown_models: bool = False
+    fail_on_policy_violation: bool = False
+
+
+@dataclass
+class Policy:
+    budgets: PolicyBudgets = field(default_factory=PolicyBudgets)
+    rules: PolicyRules = field(default_factory=PolicyRules)
+
+    def is_empty(self) -> bool:
+        b = self.budgets
+        r = self.rules
+        return (
+            b.max_monthly_delta_usd is None
+            and b.max_callsite_monthly_usd is None
+            and b.max_relative_increase is None
+            and not r.block_unknown_models
+            and not r.fail_on_policy_violation
+        )
+
+
+@dataclass
 class ProjectConfig:
     default_model: str | None = None
     default_models: dict[str, str] = field(default_factory=dict)
@@ -40,6 +74,7 @@ class ProjectConfig:
     skip_dynamic_models: bool = False
     exclude: list[str] = field(default_factory=list)
     use_default_excludes: bool = True
+    policy: Policy = field(default_factory=Policy)
     overrides: list[PathOverride] = field(default_factory=list)
     project_root: str | None = None
 
@@ -186,6 +221,8 @@ def _data_to_config(data: dict) -> ProjectConfig:
 
     use_default_excludes = bool(data.get("use_default_excludes", True))
 
+    policy = _parse_policy(data)
+
     overrides: list[PathOverride] = []
     for item in data.get("overrides", []):
         if isinstance(item, dict) and "path" in item:
@@ -208,8 +245,37 @@ def _data_to_config(data: dict) -> ProjectConfig:
         skip_dynamic_models=skip,
         exclude=exclude,
         use_default_excludes=use_default_excludes,
+        policy=policy,
         overrides=overrides,
     )
+
+
+def _parse_policy(data: dict) -> Policy:
+    raw_budgets = data.get("budgets")
+    budgets = PolicyBudgets()
+    if isinstance(raw_budgets, dict):
+        budgets.max_monthly_delta_usd = _coerce_float(raw_budgets.get("max_monthly_delta_usd"))
+        budgets.max_callsite_monthly_usd = _coerce_float(
+            raw_budgets.get("max_callsite_monthly_usd")
+        )
+        budgets.max_relative_increase = _coerce_float(raw_budgets.get("max_relative_increase"))
+
+    raw_rules = data.get("policies")
+    rules = PolicyRules()
+    if isinstance(raw_rules, dict):
+        rules.block_unknown_models = bool(raw_rules.get("block_unknown_models", False))
+        rules.fail_on_policy_violation = bool(raw_rules.get("fail_on_policy_violation", False))
+
+    return Policy(budgets=budgets, rules=rules)
+
+
+def _coerce_float(val) -> float | None:
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
 
 
 _KV_RE = re.compile(r"^(\w[\w_]*):\s*(.+)$")

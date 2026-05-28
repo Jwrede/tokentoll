@@ -1,6 +1,72 @@
 from __future__ import annotations
 
-from tokentoll.core.models import CostEstimate, DiffReport, ScanReport
+from tokentoll.core.models import (
+    CostEstimate,
+    DiffReport,
+    ScanReport,
+    Verdict,
+    VerdictLevel,
+)
+
+_VERDICT_BANNER = {
+    VerdictLevel.PASS: "PASS",
+    VerdictLevel.WARN: "WARN",
+    VerdictLevel.FAIL: "FAIL",
+}
+
+_VERDICT_REQUIRED_ACTION = {
+    VerdictLevel.FAIL: (
+        "Required action: revert the regression, raise the threshold in "
+        "`.tokentoll.yml`, or add an exemption."
+    ),
+    VerdictLevel.WARN: ("Review the findings above. The policy has not blocked this PR."),
+}
+
+
+def _format_verdict_markdown(verdict: Verdict | None) -> list[str]:
+    if verdict is None:
+        return []
+    if verdict.level == VerdictLevel.PASS and not verdict.findings:
+        return []
+
+    label = _VERDICT_BANNER[verdict.level]
+    lines = [f"## tokentoll verdict: {label}", ""]
+
+    fails = [f for f in verdict.findings if f.severity == VerdictLevel.FAIL]
+    warns = [f for f in verdict.findings if f.severity == VerdictLevel.WARN]
+
+    if fails:
+        lines.append(f"**Blocking findings ({len(fails)}):**")
+        lines.append("")
+        for f in fails:
+            loc = (
+                f"`{f.file_path}:{f.line_number}` - "
+                if f.file_path and f.line_number is not None
+                else ""
+            )
+            lines.append(f"- {loc}{f.message}")
+        lines.append("")
+
+    if warns:
+        lines.append(f"**Warnings ({len(warns)}):**")
+        lines.append("")
+        for f in warns:
+            loc = (
+                f"`{f.file_path}:{f.line_number}` - "
+                if f.file_path and f.line_number is not None
+                else ""
+            )
+            lines.append(f"- {loc}{f.message}")
+        lines.append("")
+
+    action = _VERDICT_REQUIRED_ACTION.get(verdict.level)
+    if action:
+        lines.append(f"> {action}")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("")
+    return lines
 
 
 def _model_display(model: str | None, est: CostEstimate | None = None) -> str:
@@ -66,18 +132,25 @@ def format_scan_report_markdown(report: ScanReport) -> str:
     return "\n".join(lines)
 
 
-def format_diff_report_markdown(report: DiffReport) -> str:
+def format_diff_report_markdown(report: DiffReport, verdict: Verdict | None = None) -> str:
     active_diffs = [d for d in report.call_diffs if d.change_type.value != "unchanged"]
 
     if not active_diffs:
+        verdict_lines = _format_verdict_markdown(verdict)
+        if verdict_lines:
+            return "\n".join(verdict_lines) + "## tokentoll\n\nNo LLM API cost changes detected."
         return "## tokentoll\n\nNo LLM API cost changes detected."
 
-    lines = [
-        "## tokentoll",
-        "",
-        "| | File | Line | SDK | Model | Est. Cost/Call | Monthly Delta |",
-        "|---|------|------|-----|-------|---------------|---------------|",
-    ]
+    lines: list[str] = []
+    lines.extend(_format_verdict_markdown(verdict))
+    lines.extend(
+        [
+            "## tokentoll",
+            "",
+            "| | File | Line | SDK | Model | Est. Cost/Call | Monthly Delta |",
+            "|---|------|------|-----|-------|---------------|---------------|",
+        ]
+    )
 
     icons = {
         "added": ":heavy_plus_sign:",

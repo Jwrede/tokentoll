@@ -307,3 +307,46 @@ def test_load_config_default_excludes_on_by_default():
     with tempfile.TemporaryDirectory() as tmpdir:
         config = load_config(Path(tmpdir))
         assert config.use_default_excludes is True
+
+
+def test_load_config_policy_budgets_and_rules():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / ".tokentoll.yml"
+        config_path.write_text(
+            "budgets:\n"
+            "  max_monthly_delta_usd: 250\n"
+            "  max_callsite_monthly_usd: 100\n"
+            "  max_relative_increase: 5.0\n"
+            "policies:\n"
+            "  block_unknown_models: true\n"
+            "  fail_on_policy_violation: true\n"
+        )
+        config = load_config(Path(tmpdir))
+        assert config.policy.budgets.max_monthly_delta_usd == 250.0
+        assert config.policy.budgets.max_callsite_monthly_usd == 100.0
+        assert config.policy.budgets.max_relative_increase == 5.0
+        assert config.policy.rules.block_unknown_models is True
+        assert config.policy.rules.fail_on_policy_violation is True
+
+
+def test_load_config_partial_policy():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_path = Path(tmpdir) / ".tokentoll.yml"
+        config_path.write_text("budgets:\n  max_monthly_delta_usd: 50\n")
+        config = load_config(Path(tmpdir))
+        assert config.policy.budgets.max_monthly_delta_usd == 50.0
+        assert config.policy.budgets.max_callsite_monthly_usd is None
+        assert config.policy.rules.block_unknown_models is False
+
+
+def test_policy_is_empty_default():
+    from tokentoll.config import Policy
+
+    assert Policy().is_empty() is True
+
+
+def test_policy_is_empty_with_threshold():
+    from tokentoll.config import Policy, PolicyBudgets
+
+    p = Policy(budgets=PolicyBudgets(max_monthly_delta_usd=1.0))
+    assert p.is_empty() is False

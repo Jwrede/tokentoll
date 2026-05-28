@@ -9,7 +9,9 @@ from tokentoll.core.models import (
     CostEstimate,
     DiffReport,
     ScanReport,
+    VerdictLevel,
 )
+from tokentoll.core.policy import evaluate_policy
 from tokentoll.pricing.engine import PricingEngine
 from tokentoll.scanner.python_scanner import scan_paths, scan_source
 
@@ -94,6 +96,7 @@ def run_diff_command(
     output_format: str,
     calls_per_month: int | None,
     config_path: str | None = None,
+    fail_on_policy_violation: bool = False,
 ) -> int:
     from tokentoll.diff.git import get_changed_files, get_file_at_ref
 
@@ -161,17 +164,23 @@ def run_diff_command(
         assumptions=[f"{effective_cpm} calls/month per call site"],
     )
 
+    verdict = evaluate_policy(report, config.policy)
+
     if output_format == "json":
         from tokentoll.output.json_output import format_diff_report_json
 
-        print(json.dumps(format_diff_report_json(report), indent=2))
+        print(json.dumps(format_diff_report_json(report, verdict), indent=2))
     elif output_format in ("markdown", "github-comment"):
         from tokentoll.output.markdown import format_diff_report_markdown
 
-        print(format_diff_report_markdown(report))
+        print(format_diff_report_markdown(report, verdict))
     else:
         from tokentoll.output.table import print_diff_report
 
-        print_diff_report(report)
+        print_diff_report(report, verdict)
 
+    if fail_on_policy_violation and verdict.level == VerdictLevel.FAIL:
+        return 1
+    if config.policy.rules.fail_on_policy_violation and verdict.level == VerdictLevel.FAIL:
+        return 1
     return 0

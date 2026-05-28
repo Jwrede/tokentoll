@@ -56,6 +56,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to .tokentoll.yml config file",
     )
+    diff_parser.add_argument(
+        "--fail-on-policy-violation",
+        action="store_true",
+        help="Exit 1 if the configured policy fails (default: report-only)",
+    )
 
     # update command
     subparsers.add_parser("update", help="Update bundled pricing data from LiteLLM")
@@ -81,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
             output_format=args.format,
             calls_per_month=args.calls_per_month,
             config_path=args.config,
+            fail_on_policy_violation=args.fail_on_policy_violation,
         )
 
     if args.command == "update":
