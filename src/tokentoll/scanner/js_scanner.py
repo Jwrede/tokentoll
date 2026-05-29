@@ -25,6 +25,7 @@ from tokentoll.scanner.js_resolver import (
     extract_string_literal,
     member_expression_path,
     node_text,
+    unwrap,
 )
 
 if TYPE_CHECKING:
@@ -178,6 +179,7 @@ def _collect_declarator(node: Node, source: bytes, variables: dict[str, str | in
 
     if name_node.type == "identifier":
         name = node_text(name_node, source)
+        value_node = unwrap(value_node)
         # Literal string / number
         s = extract_string_literal(value_node, source)
         if s is not None:

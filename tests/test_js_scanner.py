@@ -155,3 +155,72 @@ def test_scan_source_returns_empty_for_unrelated_ts():
 def test_scan_source_returns_empty_for_unsupported_extension():
     calls = scan_source('foo("gpt-4o")', "/tmp/x.rs")
     assert calls == []
+
+
+def test_vercel_detector_ignores_method_calls():
+    """Cohere/Ollama/IBM client methods named embed() must not be claimed
+    by the Vercel AI SDK detector.
+
+    Regression for v0.8 dogfood: scanning langchainjs surfaced false
+    positives in langchain-cohere/embeddings.ts (`this.client.embed(req)`)
+    because the Vercel detector accepted any member-expression callee
+    ending in embed/embedMany/generateText/streamText.
+    """
+    calls = _scan_fixture("cohere_embed_not_vercel.ts")
+    # No Vercel AI SDK detections — this file imports cohere-ai, not @ai-sdk.
+    assert all(c.sdk != "vercel_ai_sdk" for c in calls)
+
+
+def test_this_chain_call():
+    """Member chains rooted at `this` (and `super`) must resolve.
+
+    Regression for v0.8 dogfood: anthropic-sdk-typescript and similar
+    class-based clients use `this.client.messages.create(...)` which
+    previously slipped through the detector because member_expression_path
+    only accepted identifier bases.
+    """
+    calls = _scan_fixture("this_chain.ts")
+    assert len(calls) == 2
+    create = next(c for c in calls if c.model == "claude-sonnet-4-5")
+    assert create.sdk == "anthropic"
+    assert create.max_tokens == 2048
+    beta = next(c for c in calls if c.model == "claude-haiku-3-5-20241022")
+    assert beta.sdk == "anthropic"
+    assert beta.max_tokens == 1024
+
+
+def test_ts_wrapper_unwrapping():
+    """TS-only wrappers (as, satisfies, !, parens, <T>) must not hide values.
+
+    Regression for v0.8 dogfood: chatbot-ui and similar TS apps wrap call
+    arguments with `as Foo`, which left the resolver returning None and
+    obscured real model names.
+    """
+    calls = _scan_fixture("ts_wrappers.ts")
+    assert len(calls) == 5
+
+    by_line = {c.line_number: c for c in calls}
+
+    as_call = next(
+        c
+        for c in calls
+        if "asCast" not in c.raw_expression and c.model == "gpt-4o-mini" and c.max_tokens == 1024
+    )
+    assert as_call.model_is_literal is True
+
+    satisfies_call = next(c for c in calls if c.model == "gpt-4o" and c.max_tokens is None)
+    assert satisfies_call.model_is_literal is True
+
+    non_null_call = next(
+        c
+        for c in by_line.values()
+        if c.model == "gpt-4o" and c.max_tokens is None and c is not satisfies_call
+    )
+    # MODEL! resolves through the variable map; not a string literal in the call args.
+    assert non_null_call.model_is_literal is False
+
+    parens_calls = [c for c in calls if c.model == "gpt-4o-mini"]
+    assert len(parens_calls) == 2
+
+    legacy_call = next(c for c in calls if c.model == "claude-not-really")
+    assert legacy_call.model_is_literal is True

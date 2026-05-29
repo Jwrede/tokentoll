@@ -49,9 +49,51 @@ def node_text(node: Node, source: bytes) -> str:
     return source[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
 
 
+# TypeScript node types that wrap an inner expression without changing its
+# runtime value. We unwrap these before extracting or resolving so that
+# `MODEL as Foo`, `MODEL!`, `(MODEL)`, `MODEL satisfies Foo`, and the legacy
+# `<Foo>MODEL` all behave the same as `MODEL`.
+_WRAPPER_TYPES: frozenset[str] = frozenset(
+    {
+        "as_expression",
+        "satisfies_expression",
+        "non_null_expression",
+        "parenthesized_expression",
+        "type_assertion",
+    }
+)
+
+
+def unwrap(node: Node) -> Node:
+    """Strip TypeScript type wrappers and parentheses from an expression node."""
+    while node.type in _WRAPPER_TYPES:
+        # type_assertion is `<T>value`: type comes first, then value.
+        # All other wrappers have value first.
+        if node.type == "type_assertion":
+            value = None
+            for c in node.children:
+                if c.is_named and c.type != "type_arguments":
+                    value = c
+                    break
+            if value is None:
+                return node
+            node = value
+        else:
+            inner = None
+            for c in node.children:
+                if c.is_named:
+                    inner = c
+                    break
+            if inner is None:
+                return node
+            node = inner
+    return node
+
+
 def extract_string_literal(node: Node, source: bytes) -> str | None:
     """Return the string value if node is a literal string or template
     string without interpolation. Returns None otherwise."""
+    node = unwrap(node)
     if node.type == "string":
         parts: list[str] = []
         for c in node.children:
@@ -74,6 +116,7 @@ def extract_string_literal(node: Node, source: bytes) -> str | None:
 
 
 def extract_int_literal(node: Node, source: bytes) -> int | None:
+    node = unwrap(node)
     if node.type != "number":
         return None
     text = node_text(node, source)
@@ -106,6 +149,10 @@ def member_expression_path(node: Node, source: bytes) -> list[str] | None:
         current = obj
     if current.type == "identifier":
         parts.append(node_text(current, source))
+    elif current.type == "this":
+        parts.append("this")
+    elif current.type == "super":
+        parts.append("super")
     else:
         return None
     parts.reverse()
@@ -158,6 +205,7 @@ def resolve_string(
     """Resolve a node to a string with fallback strategies."""
     if node is None:
         return None
+    node = unwrap(node)
 
     direct = extract_string_literal(node, source)
     if direct is not None:
@@ -211,6 +259,7 @@ def resolve_int(
 ) -> int | None:
     if node is None:
         return None
+    node = unwrap(node)
 
     direct = extract_int_literal(node, source)
     if direct is not None:

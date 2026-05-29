@@ -27,6 +27,7 @@ from tokentoll.scanner.js_resolver import (
     node_text,
     resolve_int,
     resolve_string,
+    unwrap,
 )
 from tokentoll.scanner.js_scanner import walk_calls
 
@@ -138,6 +139,11 @@ class VercelAiSdkDetector(BaseJsDetector):
 
 
 def _vercel_fn_name(call_node: Node, source: bytes) -> str | None:
+    """Vercel AI SDK functions are imported and called bare, never as methods.
+
+    Restricting to identifier-shape callees prevents matching client method
+    calls like `client.embed(request)` from non-Vercel libraries that happen
+    to expose the same function name (e.g., langchain-cohere)."""
     func = call_node.child_by_field_name("function")
     if func is None:
         return None
@@ -145,11 +151,6 @@ def _vercel_fn_name(call_node: Node, source: bytes) -> str | None:
         name = node_text(func, source)
         if name in _CHAT_FNS or name in _EMBED_FNS:
             return name
-        return None
-    if func.type == "member_expression":
-        path = member_expression_path(func, source)
-        if path and path[-1] in (_CHAT_FNS | _EMBED_FNS):
-            return path[-1]
     return None
 
 
@@ -157,6 +158,7 @@ def _infer_sdk_from_model_node(model_node: Node, source: bytes) -> str:
     """Map openai("gpt-4o") -> "openai", anthropic("...") -> "anthropic", etc.
 
     Falls back to "vercel_ai_sdk" when the wrapper is unknown."""
+    model_node = unwrap(model_node)
     if model_node.type != "call_expression":
         return "vercel_ai_sdk"
     func = model_node.child_by_field_name("function")
