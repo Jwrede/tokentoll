@@ -75,14 +75,14 @@ def print_scan_report(report: ScanReport) -> None:
 def _print_verdict(verdict: Verdict | None) -> None:
     if verdict is None:
         return
-    if verdict.level == VerdictLevel.PASS and not verdict.findings:
-        return
     label = verdict.level.value.upper()
     print(f"tokentoll verdict: {label}")
     print("-" * 60)
     for f in verdict.findings:
         loc = f"{f.file_path}:{f.line_number}  " if f.file_path and f.line_number else ""
         print(f"  [{f.severity.value.upper()}] {loc}{f.message}")
+    if verdict.level == VerdictLevel.PASS and not verdict.findings:
+        print("  All configured budgets and rules were satisfied.")
     print()
 
 

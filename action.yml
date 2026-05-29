@@ -10,9 +10,9 @@ inputs:
     required: false
     default: ${{ github.token }}
   calls-per-month:
-    description: "Assumed monthly call volume per call site"
+    description: "Assumed monthly call volume per call site. Leave empty to use .tokentoll.yml's calls_per_month (default 1000)"
     required: false
-    default: "1000"
+    default: ""
   base-ref:
     description: "Base git ref for comparison (default: PR base)"
     required: false
@@ -46,7 +46,7 @@ runs:
 
     - name: Install tokentoll
       shell: bash
-      run: pip install 'tokentoll==0.8.1'
+      run: pip install 'tokentoll==0.8.2'
 
     - name: Run analysis
       id: run
@@ -56,10 +56,15 @@ runs:
         INPUT_BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
         INPUT_HEAD_REF: ${{ inputs.head-ref || github.event.pull_request.head.sha }}
       run: |
+        CPM_FLAG=""
+        if [ -n "${INPUT_CALLS_PER_MONTH}" ]; then
+          CPM_FLAG="--calls-per-month=${INPUT_CALLS_PER_MONTH}"
+        fi
+
         DIFF_JSON=$(tokentoll diff \
           --base="${INPUT_BASE_REF}" \
           --head="${INPUT_HEAD_REF}" \
-          --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+          ${CPM_FLAG} \
           --format=json 2>/dev/null) || true
 
         DELTA=$(echo "${DIFF_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_monthly_delta', 0))" 2>/dev/null) || DELTA=0
@@ -73,7 +78,7 @@ runs:
           COMMENT=$(tokentoll diff \
             --base="${INPUT_BASE_REF}" \
             --head="${INPUT_HEAD_REF}" \
-            --calls-per-month="${INPUT_CALLS_PER_MONTH}" \
+            ${CPM_FLAG} \
             --format=github-comment 2>&1) || true
           echo "${COMMENT}" > /tmp/tokentoll-comment.md
         fi

@@ -165,19 +165,23 @@ def run_diff_command(
     )
 
     verdict = evaluate_policy(report, config.policy)
+    # When no policy is configured, suppress the verdict so the comment is
+    # just a neutral cost diff. When policy IS configured, render the
+    # verdict (including PASS) so users can see the gate is wired up.
+    verdict_for_output = verdict if not config.policy.is_empty() else None
 
     if output_format == "json":
         from tokentoll.output.json_output import format_diff_report_json
 
-        print(json.dumps(format_diff_report_json(report, verdict), indent=2))
+        print(json.dumps(format_diff_report_json(report, verdict_for_output), indent=2))
     elif output_format in ("markdown", "github-comment"):
         from tokentoll.output.markdown import format_diff_report_markdown
 
-        print(format_diff_report_markdown(report, verdict))
+        print(format_diff_report_markdown(report, verdict_for_output))
     else:
         from tokentoll.output.table import print_diff_report
 
-        print_diff_report(report, verdict)
+        print_diff_report(report, verdict_for_output)
 
     if fail_on_policy_violation and verdict.level == VerdictLevel.FAIL:
         return 1

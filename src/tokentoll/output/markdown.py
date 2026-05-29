@@ -26,8 +26,6 @@ _VERDICT_REQUIRED_ACTION = {
 def _format_verdict_markdown(verdict: Verdict | None) -> list[str]:
     if verdict is None:
         return []
-    if verdict.level == VerdictLevel.PASS and not verdict.findings:
-        return []
 
     label = _VERDICT_BANNER[verdict.level]
     lines = [f"## tokentoll verdict: {label}", ""]
@@ -57,6 +55,10 @@ def _format_verdict_markdown(verdict: Verdict | None) -> list[str]:
                 else ""
             )
             lines.append(f"- {loc}{f.message}")
+        lines.append("")
+
+    if verdict.level == VerdictLevel.PASS and not fails and not warns:
+        lines.append("All configured budgets and rules were satisfied.")
         lines.append("")
 
     action = _VERDICT_REQUIRED_ACTION.get(verdict.level)
