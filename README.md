@@ -19,8 +19,8 @@ tokentoll is a CI gate for LLM cost. It statically analyzes Python, JavaScript, 
 
 [Jwrede/tokentoll-demo](https://github.com/Jwrede/tokentoll-demo) is a small polyglot LLM app (Python + TypeScript) wired up to the tokentoll cost gate. Two PRs are already open against it:
 
-- [PR #1: Add Anthropic Haiku translation helper](https://github.com/Jwrede/tokentoll-demo/pull/1) — new call site, well within budget. Verdict: PASS, workflow green.
-- [PR #2: switch supportbot to gpt-4o](https://github.com/Jwrede/tokentoll-demo/pull/2) — a model swap that trips two policy rules. Verdict: FAIL, workflow red.
+- [PR #1: Add Anthropic Haiku translation helper](https://github.com/Jwrede/tokentoll-demo/pull/1). New call site, well within budget. Verdict: PASS, workflow green.
+- [PR #2: switch supportbot to gpt-4o](https://github.com/Jwrede/tokentoll-demo/pull/2). A model swap that trips two policy rules. Verdict: FAIL, workflow red.
 
 Open each PR's conversation tab to see the verdict comment tokentoll actually posts.
 
