@@ -1,45 +1,50 @@
-# Show HN: tokentoll - Catch LLM cost changes in code review
+# Show HN: Tokentoll - Static analysis that catches LLM cost changes in code review
 
 ## Title (for HN submit box)
 
-Show HN: tokentoll - Catch LLM API cost changes in code review
+Show HN: Tokentoll - Static analysis that catches LLM cost changes in code review
 
 ## URL
 
 https://github.com/Jwrede/tokentoll
 
-## Body (optional, only if posting as text instead of link)
+## First comment (post immediately after submitting)
 
-A model swap from gpt-4o-mini to gpt-4o costs 15x more. A new API call in a
-hot path can add $10k/month. These changes hide in normal code review.
+I kept finding model swaps in PRs that looked harmless but caused cost spikes.
+A gpt-4o-mini to gpt-4o change is 15x more expensive per token, and it's
+invisible in a normal diff.
 
-tokentoll is a CLI tool (and GitHub Action) that statically analyzes your Python
-code for LLM API calls, estimates their cost, and shows you the cost impact of
-every change.
+tokentoll statically analyzes Python, JavaScript, and TypeScript for LLM API
+calls (OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Vercel AI SDK,
+Zhipu), resolves model names through variable assignments, **kwargs,
+os.getenv()/process.env fallbacks, and looks up real pricing for 2200+ models.
+The interesting technical bit is the multi-pass constant propagation that
+follows model names through class attributes, constructor args, dict unpacking,
+and Vercel AI SDK provider wrappers.
 
-    pip install tokentoll
-    tokentoll scan .          # find all LLM calls and their costs
-    tokentoll diff HEAD~1     # show cost impact of last commit
+Example:
 
-It uses Python's ast module to detect calls to OpenAI, Anthropic, Google GenAI,
-LiteLLM, LangChain, and Zhipu (GLM) SDKs. A multi-pass constant propagation engine follows
-variable assignments, class attributes, **kwargs, os.getenv() fallbacks, and
-constructor arguments to resolve model names that aren't string literals.
+    $ tokentoll diff HEAD~1
 
-When a model name is truly dynamic (loaded from a database, external config),
-tokentoll applies sensible per-SDK defaults (e.g. Anthropic calls use
-claude-sonnet pricing, Google calls use gemini-flash) so you still get useful
-estimates. These defaults are configurable via a .tokentoll.yml file.
+    ~ MODIFIED src/agents/summarizer.py:42
+      openai | Model: gpt-4o-mini -> gpt-4o
+      Monthly: +$26.20 (15x increase)
 
-Pricing data is sourced from LiteLLM's database (2200+ models). Zero runtime
-dependencies. Works offline with bundled pricing data.
+Also works as a GitHub Action that comments PASS/WARN/FAIL on PRs against a
+policy you define (max_monthly_delta_usd, max_relative_increase,
+block_unknown_models). Zero runtime dependencies (stdlib + tree-sitter for
+JS/TS). Path exclusions and per-path config via .tokentoll.yml.
 
-Think Infracost, but for LLM API spend instead of cloud infrastructure.
-
-https://github.com/Jwrede/tokentoll
+Adoption so far: merged into assafelovic/gpt-researcher (27k stars) and a
+handful of smaller AI apps. Would love feedback on SDK patterns I'm missing or
+false positives you run into.
 
 ## Posting notes
 
-- Post on Tuesday or Wednesday around 9am ET
-- Keep it factual, no hype
+- Best time: Sunday 00:00-02:00 UTC (Saturday evening US Pacific, lowest competition)
+- Weekday alternative: Tuesday-Thursday 14:00-17:00 UTC
+- Link post format (title + URL, no body text)
+- Post the first comment immediately after submitting
 - Respond to every comment within an hour
+- Do NOT frame as "AI tool", frame as developer cost visibility
+- Do NOT ask anyone to upvote via direct link (HN detects voting rings)

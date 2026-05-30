@@ -34,8 +34,11 @@ Until now.
 
 ## Introducing tokentoll
 
-tokentoll is a CLI tool that statically analyzes your Python code for LLM API
-calls and shows you the cost impact of every change.
+tokentoll is a CLI tool and GitHub Action that statically analyzes Python,
+JavaScript, and TypeScript for LLM API calls and posts a PASS/WARN/FAIL
+verdict on every PR against a policy you control. Recently merged into
+[assafelovic/gpt-researcher](https://github.com/assafelovic/gpt-researcher)
+(27k stars).
 
 ```bash
 pip install tokentoll
@@ -51,14 +54,21 @@ tokentoll diff HEAD~1
 
 ### What it detects
 
-tokentoll uses Python's `ast` module to find calls to:
+tokentoll uses Python's `ast` module and tree-sitter (for JS/TS) to find calls to:
 
-- **OpenAI**: `chat.completions.create`, `responses.create`
+Python:
+- **OpenAI**: `chat.completions.create`, `responses.create`, `embeddings.create`
 - **Anthropic**: `messages.create`, `messages.stream`
 - **Google GenAI**: `models.generate_content`
 - **LiteLLM**: `completion`, `acompletion`
 - **LangChain**: `ChatOpenAI`, `ChatAnthropic`, `init_chat_model`
 - **Zhipu AI**: `ZhipuAiClient`, `ZhipuAI` (GLM models)
+
+JavaScript / TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`):
+- **OpenAI Node SDK**: `client.chat.completions.create`, `client.responses.create`, `client.embeddings.create`
+- **Anthropic SDK**: `client.messages.create`, `client.messages.stream`
+- **Vercel AI SDK**: `generateText`, `streamText`, `generateObject`, `embed`, `embedMany`
+- **LangChain.js**: `new ChatOpenAI`, `new ChatAnthropic`, `new ChatGoogleGenerativeAI`
 
 For each call, it extracts the model name, max_tokens, and any estimable token
 counts from prompt strings. Then it looks up real pricing from a database of
@@ -119,7 +129,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Jwrede/tokentoll@v0.6.1
+      - uses: Jwrede/tokentoll@v0.8.3
+        with:
+          fail-on-policy-violation: true
 ```
 
 ### Configuration
@@ -133,9 +145,15 @@ default_models:
   openai: gpt-4o-mini
   anthropic: claude-haiku-3-20240307
 
+# Skip test and example files entirely
+exclude:
+  - tests/
+  - examples/
+  - "*_test.py"
+
 overrides:
-  - path: tests/
-    calls_per_month: 100
+  - path: src/agents/
+    calls_per_month: 10000
 ```
 
 ## How the AST parsing works
@@ -193,6 +211,17 @@ tokentoll is static analysis. It cannot:
 - Predict actual call volume (it assumes a configurable calls-per-month)
 
 These are flagged in the output so you know what to watch for.
+
+## What is next
+
+- **Context-aware call frequency**: infer volume from surrounding code (FastAPI
+  route handlers = high traffic, CLI scripts = low, loops = multiplied) instead
+  of uniform assumptions
+- **Cross-file import resolution for JS/TS**: today JS/TS model resolution is
+  same-file only; an imported model constant from another module is treated as
+  dynamic
+- **Public demo repo**: a polyglot LLM app wired up to the cost gate, with
+  passing and failing PRs already open against it
 
 ## Try it
 

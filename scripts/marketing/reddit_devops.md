@@ -2,38 +2,61 @@
 
 ## Title
 
-GitHub Action that comments on PRs with LLM API cost impact (like Infracost for Terraform)
+GitHub Action that comments on PRs with LLM API cost impact (like Infracost for Terraform, but for model calls)
 
 ## Body
 
-If your team uses LLM APIs (OpenAI, Anthropic, etc.), you've probably had
-surprise cost spikes from model swaps or new API calls that slipped through
-code review.
+If your team uses LLM APIs, you've probably had a surprise bill from a model swap that slipped through review. A `gpt-4o-mini` to `gpt-4o` change is 15x more expensive and looks like a one-word diff.
 
-I built **tokentoll**, a GitHub Action (and CLI) that statically analyzes
-Python code for LLM API calls, estimates their cost, and posts the delta as a
-PR comment.
+**tokentoll** is a GitHub Action that posts a PASS/WARN/FAIL verdict on every PR against a policy you control. Recently merged into assafelovic/gpt-researcher (27k stars).
 
 ```yaml
-- uses: Jwrede/tokentoll@v0.6.1
+name: LLM Cost Diff
+on:
+  pull_request:
+    paths: ["**.py", "**.ts", "**.tsx", "**.js", "**.jsx"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  cost-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Jwrede/tokentoll@v0.8.3
+        with:
+          fail-on-policy-violation: true
 ```
 
-![demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
+The PR comment shows:
 
-It detects model swaps (gpt-4o-mini -> gpt-4o = 15x cost increase), new API
-calls, and removed endpoints. The PR comment shows a table with per-call cost
-and monthly impact.
+```
+~ MODIFIED src/agents/summarizer.py:42
+  openai | Model: gpt-4o-mini -> gpt-4o
+  Monthly: +$26.20 (15x increase)
 
-When model names are dynamic (loaded from env vars or config at runtime),
-it applies per-SDK defaults so you still get useful estimates. Anthropic calls
-get claude-sonnet pricing, Google calls get gemini-flash, and so on.
++ ADDED src/pipeline/rewriter.py:35
+  openai | Model: gpt-4o
+  Monthly: +$26.50
 
-Same concept as Infracost for Terraform, but for LLM API spend.
+Monthly cost impact: +$52.70
+```
 
-- Pricing data from LiteLLM (2200+ models), auto-cached
-- Supports OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu (GLM)
-- Configurable via `.tokentoll.yml` (per-path overrides, custom defaults)
-- Zero runtime dependencies
-- MIT licensed
+Under the hood it uses Python AST and tree-sitter for JS/TS to find LLM API calls (OpenAI, Anthropic, Google, LiteLLM, LangChain, Zhipu, Vercel AI SDK, LangChain.js), resolve model names through variable assignments and env vars, and look up real pricing for 2200+ models.
+
+Configurable via `.tokentoll.yml` with path exclusions and per-path overrides. Zero runtime dependencies. Action is pinned to a SHA.
 
 GitHub: https://github.com/Jwrede/tokentoll
+
+Anyone else dealing with LLM cost visibility in CI? Curious what your setup looks like.
+
+## Posting notes
+
+- Post Tuesday-Thursday, 6-10 AM US Eastern
+- Post this one SECOND (medium audience, ~350K)
+- At least 24 hours after r/Python post
+- Frame as infrastructure/guardrail, not a Python library

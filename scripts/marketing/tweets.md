@@ -1,55 +1,53 @@
 # X/Twitter Launch Thread
 
-## Tweet 1 (hook)
+## Tweet 1 (hook + demo)
 
 A model swap from gpt-4o-mini to gpt-4o costs 15x more.
 
-These changes hide in normal code review.
+It looks like a one-word diff. Tests pass. Linter is happy. Reviewer approves.
 
-I built tokentoll, a CLI that catches LLM cost changes before they ship.
+Then the bill spikes.
+
+I built tokentoll to catch this before it ships:
+
+$ tokentoll diff HEAD~1
+
+~ MODIFIED src/agents/summarizer.py:42
+  openai | Model: gpt-4o-mini -> gpt-4o
+  Monthly: +$26.20 (15x increase)
 
 pip install tokentoll
-tokentoll diff HEAD~1
-
-Zero dependencies. 2200+ models. Works offline.
 
 github.com/Jwrede/tokentoll
 
 [ATTACH: demo/demo.gif]
 
-## Tweet 2 (demo)
+## Tweet 2 (technical angle, reply to tweet 1)
 
 How it works:
 
-1. Parses your Python with ast module
-2. Multi-pass constant propagation resolves model names through variables, **kwargs, class attrs
-3. Detects OpenAI, Anthropic, Google, LiteLLM, LangChain, Zhipu (GLM) calls
-4. Looks up real pricing (2200+ models, auto-cached)
-5. Shows you the cost delta
+tokentoll uses Python's ast module to find LLM API calls and resolve model names through variables, **kwargs, os.getenv() fallbacks, class attributes, and constructor args.
 
-Dynamic models get per-SDK defaults (Anthropic -> claude-sonnet, Google -> gemini-flash).
+Pricing for 2200+ models. Zero runtime dependencies. Stdlib only.
 
-## Tweet 3 (GitHub Action angle)
+It catches what code review misses: the dollar sign.
 
-It also works as a GitHub Action.
+## Tweet 3 (GitHub Action angle, reply to tweet 2)
 
-Every PR gets a comment showing the cost impact of LLM API changes.
+It also works as a GitHub Action. One line of YAML:
 
-Model swap? New API call? Removed endpoint? You see the dollar impact before merging.
+- uses: Jwrede/tokentoll@v0.8.3
 
-3 lines of YAML to add it to any repo:
+Every PR gets a PASS/WARN/FAIL verdict against a policy you define: max monthly delta, max relative increase, block unknown models.
 
-- uses: Jwrede/tokentoll@v0.6.1
+Like Infracost for Terraform, but for LLM API spend.
 
-## Tweet 4 (CTA)
+## Tweet 4 (adoption + CTA, reply to tweet 3)
 
-If you're building with LLM APIs, give it a try:
+Just merged into assafelovic/gpt-researcher (27k stars).
 
-pip install tokentoll
-tokentoll scan .
+Detects: OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu in Python. Plus OpenAI Node SDK, Anthropic SDK, Vercel AI SDK, LangChain.js in JS and TS via tree-sitter.
 
-Configurable via .tokentoll.yml with per-path overrides and per-SDK model defaults.
+Star if useful: github.com/Jwrede/tokentoll
 
-Star it if it's useful: github.com/Jwrede/tokentoll
-
-Zero runtime dependencies, MIT licensed.
+What SDK patterns am I missing?

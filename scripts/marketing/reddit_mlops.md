@@ -2,39 +2,58 @@
 
 ## Title
 
-I built a CLI that catches LLM API cost changes in code review (like Infracost for Terraform)
+A gpt-4o-mini to gpt-4o swap costs 15x more and is invisible in code review. I built a CI step that catches it.
 
 ## Body
 
-I kept running into the same problem: someone swaps a model in a PR, the code
-review looks fine, and then the LLM bill spikes. A gpt-4o-mini to gpt-4o swap
-is a 15x cost increase that's invisible in a diff.
+I've seen this happen twice now: someone changes a model parameter in a PR, it passes review because the code logic is fine, and the LLM bill spikes. The problem is that cost is not visible in a diff.
 
-So I built **tokentoll**, a CLI tool that statically analyzes Python code for
-LLM API calls and shows you the cost impact of changes.
+**tokentoll** is a CLI (and GitHub Action) that statically analyzes Python, JS, and TS for LLM API calls, estimates their cost using real pricing data, and posts a PASS/WARN/FAIL verdict on every PR. Recently merged into assafelovic/gpt-researcher (27k stars).
 
-```
-pip install tokentoll
-tokentoll scan .          # show all LLM calls and estimated costs
-tokentoll diff HEAD~1     # show cost impact of last commit
+```yaml
+# Add to your CI pipeline
+- uses: Jwrede/tokentoll@v0.8.3
+  with:
+    fail-on-policy-violation: true
 ```
 
-![demo](https://raw.githubusercontent.com/Jwrede/tokentoll/main/demo/demo.gif)
+It posts a comment on the PR showing what changed:
 
-It detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, and
-Zhipu (GLM) SDKs using Python's ast module. Pricing data comes from LiteLLM's database
-(2200+ models) and is cached locally.
+```
+~ MODIFIED src/agents/summarizer.py:42
+  openai | Model: gpt-4o-mini -> gpt-4o
+  Monthly: +$26.20 per call site (15x increase)
 
-When model names are dynamic (loaded from env vars or config), it applies
-per-SDK defaults (Anthropic calls get claude-sonnet pricing, Google calls
-get gemini-flash, etc.) so you still see useful estimates. Everything is
-configurable via a `.tokentoll.yml` file.
++ ADDED src/pipeline/embedder.py:18
+  openai | Model: text-embedding-3-large
+  Monthly: +$4.80
+```
 
-Also works as a GitHub Action that posts cost diffs as PR comments.
+It detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, and Zhipu in Python via AST, plus the OpenAI Node SDK, Anthropic SDK, Vercel AI SDK, and LangChain.js in JS/TS via tree-sitter. Model names are resolved through variable assignments, env var fallbacks, class attributes, and `**kwargs` / object literal unpacking.
 
-Zero runtime dependencies. MIT licensed.
+You can configure it per-path via `.tokentoll.yml`:
+
+```yaml
+exclude:
+  - tests/
+  - examples/
+
+overrides:
+  - path: src/agents/
+    calls_per_month: 10000
+```
+
+Zero runtime dependencies. Pricing data covers 2200+ models (sourced from LiteLLM). Works offline.
+
+Next up: context-aware frequency inference (auto-detect route handlers vs batch jobs vs scripts instead of assuming uniform call volume), and cross-file import resolution for JS/TS.
 
 GitHub: https://github.com/Jwrede/tokentoll
 
-Would love feedback, especially on what SDK patterns I'm missing or edge
-cases you'd want handled.
+How are you currently tracking LLM cost changes before they hit production?
+
+## Posting notes
+
+- Post Tuesday-Thursday, 6-10 AM US Eastern
+- Post this one THIRD (smallest audience, ~67K, but highly targeted)
+- At least 24 hours after r/devops post
+- Frame as a pipeline stage, not a Python library
