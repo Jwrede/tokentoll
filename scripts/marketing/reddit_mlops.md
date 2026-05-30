@@ -2,54 +2,56 @@
 
 ## Title
 
-A gpt-4o-mini to gpt-4o swap costs 15x more and is invisible in code review. I built a CI step that catches it.
+Static analysis CI gate for LLM cost regressions: PASS/WARN/FAIL on every PR
 
 ## Body
 
-I've seen this happen twice now: someone changes a model parameter in a PR, it passes review because the code logic is fine, and the LLM bill spikes. The problem is that cost is not visible in a diff.
+The cost regression pattern I keep seeing in PR review: a model parameter changes, the code logic is fine, the test suite passes, and the LLM bill goes up. Cost is invisible in a diff. Infracost solved the equivalent for Terraform but nothing focused on LLM API calls existed.
 
-**tokentoll** is a CLI (and GitHub Action) that statically analyzes Python, JS, and TS for LLM API calls, estimates their cost using real pricing data, and posts a PASS/WARN/FAIL verdict on every PR. Recently merged into assafelovic/gpt-researcher (27k stars).
+**tokentoll** is a CI gate for this. It statically analyzes Python (`ast` module), JavaScript, and TypeScript (`tree-sitter` with the official JS and TS grammars), prices every LLM SDK call against a 2200+ model catalog from LiteLLM, and posts a PASS/WARN/FAIL verdict on every PR against a policy you define.
 
-```yaml
-# Add to your CI pipeline
-- uses: Jwrede/tokentoll@v0.8.3
-  with:
-    fail-on-policy-violation: true
+Detection coverage today:
+
+- Python: OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu
+- JS/TS: OpenAI Node SDK, Anthropic SDK, Vercel AI SDK, LangChain.js
+
+Policy rules (independent, each enabled by setting a value):
+
+- `max_monthly_delta_usd`: total estimated monthly delta cap
+- `max_callsite_monthly_usd`: per-call-site cap
+- `max_relative_increase`: per-call cost multiplier cap
+- `block_unknown_models`: any unpriced or unresolved model is a violation
+
+Example FAIL output:
+
+```md
+## tokentoll verdict: FAIL
+
+Blocking findings (2):
+
+- src/agent.py:42 per-call cost grew 15.0x (threshold 5x)
+- total monthly delta +$812.00 exceeds budget $250.00
 ```
 
-It posts a comment on the PR showing what changed:
+There is also an MCP server (`tokentoll-mcp`) so Claude Code and other MCP hosts can run `scan` and `diff` from inside an agent conversation.
 
-```
-~ MODIFIED src/agents/summarizer.py:42
-  openai | Model: gpt-4o-mini -> gpt-4o
-  Monthly: +$26.20 per call site (15x increase)
+Honest limitations.
 
-+ ADDED src/pipeline/embedder.py:18
-  openai | Model: text-embedding-3-large
-  Monthly: +$4.80
-```
+- Static analysis only. Models loaded from a database or remote config cannot be resolved; tokentoll falls back to a per-SDK default and marks the call as a default lookup.
+- Token estimates use a chars/4 heuristic unless tiktoken is installed (`pip install tokentoll[tiktoken]`).
+- Monthly estimates assume uniform call volume per call site, configurable per project or per path via `.tokentoll.yml`.
+- JS/TS model resolution is same-file only. Cross-module import resolution is on the roadmap.
 
-It detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, and Zhipu in Python via AST, plus the OpenAI Node SDK, Anthropic SDK, Vercel AI SDK, and LangChain.js in JS/TS via tree-sitter. Model names are resolved through variable assignments, env var fallbacks, class attributes, and `**kwargs` / object literal unpacking.
+Adoption: merged into `assafelovic/gpt-researcher` (27k stars), plus a couple of smaller AI apps. v0.8.3 (shipped today) fixes a diff-matching bug that surfaced phantom REMOVED + ADDED pairs when calls shifted lines during refactor.
 
-You can configure it per-path via `.tokentoll.yml`:
+Install:
 
-```yaml
-exclude:
-  - tests/
-  - examples/
-
-overrides:
-  - path: src/agents/
-    calls_per_month: 10000
-```
-
-Zero runtime dependencies. Pricing data covers 2200+ models (sourced from LiteLLM). Works offline.
-
-Next up: context-aware frequency inference (auto-detect route handlers vs batch jobs vs scripts instead of assuming uniform call volume), and cross-file import resolution for JS/TS.
+    pip install tokentoll
+    tokentoll diff main..HEAD
 
 GitHub: https://github.com/Jwrede/tokentoll
 
-How are you currently tracking LLM cost changes before they hit production?
+Curious how others tackle this in pipelines today. Runtime tracing? Budgets from the billing API? Manual review?
 
 ## Posting notes
 

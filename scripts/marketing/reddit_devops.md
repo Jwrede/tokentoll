@@ -2,26 +2,33 @@
 
 ## Title
 
-GitHub Action that comments on PRs with LLM API cost impact (like Infracost for Terraform, but for model calls)
+GitHub Action that blocks PRs on LLM API cost regressions (like Infracost for Terraform, but for model calls)
 
 ## Body
 
-If your team uses LLM APIs, you've probably had a surprise bill from a model swap that slipped through review. A `gpt-4o-mini` to `gpt-4o` change is 15x more expensive and looks like a one-word diff.
+If your team is shipping LLM features, the cost regression vector that is hardest to see in code review is a one-word model swap. `gpt-4o-mini` to `gpt-4o` is about 15x more expensive per token. It looks like a typo fix in a diff. Tests pass, CI is green, the bill spikes next month.
 
-**tokentoll** is a GitHub Action that posts a PASS/WARN/FAIL verdict on every PR against a policy you control. Recently merged into assafelovic/gpt-researcher (27k stars).
+**tokentoll** is a GitHub Action that adds a real gate. It parses Python (ast), JavaScript, and TypeScript (tree-sitter) for LLM SDK calls, prices them against a bundled 2200+ model catalog, and posts a PASS/WARN/FAIL verdict on the PR. With `fail-on-policy-violation: true`, a FAIL exits non-zero so the check goes red and blocks the merge.
+
+Minimal workflow:
 
 ```yaml
-name: LLM Cost Diff
+name: tokentoll
 on:
   pull_request:
-    paths: ["**.py", "**.ts", "**.tsx", "**.js", "**.jsx"]
+    paths:
+      - "**.py"
+      - "**.ts"
+      - "**.tsx"
+      - "**.js"
+      - "**.jsx"
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  cost-diff:
+  cost-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,27 +39,37 @@ jobs:
           fail-on-policy-violation: true
 ```
 
-The PR comment shows:
+Policy at `.tokentoll.yml` in the repo root:
+
+```yaml
+budgets:
+  max_monthly_delta_usd: 250
+  max_callsite_monthly_usd: 100
+  max_relative_increase: 5.0
+
+policies:
+  block_unknown_models: true
+  fail_on_policy_violation: true
+```
+
+The PR comment when a budget is blown:
 
 ```
-~ MODIFIED src/agents/summarizer.py:42
-  openai | Model: gpt-4o-mini -> gpt-4o
-  Monthly: +$26.20 (15x increase)
+## tokentoll verdict: FAIL
 
-+ ADDED src/pipeline/rewriter.py:35
-  openai | Model: gpt-4o
-  Monthly: +$26.50
+Blocking findings (2):
 
-Monthly cost impact: +$52.70
+- src/agent.py:42 per-call cost grew 15.0x (threshold 5x)
+- total monthly delta +$812.00 exceeds budget $250.00
+
+Required action: revert the regression, raise the threshold, or add an exemption.
 ```
 
-Under the hood it uses Python AST and tree-sitter for JS/TS to find LLM API calls (OpenAI, Anthropic, Google, LiteLLM, LangChain, Zhipu, Vercel AI SDK, LangChain.js), resolve model names through variable assignments and env vars, and look up real pricing for 2200+ models.
+Security posture. No API keys required, no telemetry, pricing data ships in the package, runs entirely inside your CI environment. The action supports SHA pinning for supply-chain hygiene; the README lists the recommended pin.
 
-Configurable via `.tokentoll.yml` with path exclusions and per-path overrides. Zero runtime dependencies. Action is pinned to a SHA.
+Adoption so far: merged into `assafelovic/gpt-researcher` (27k stars) and a few smaller AI apps. Source: https://github.com/Jwrede/tokentoll
 
-GitHub: https://github.com/Jwrede/tokentoll
-
-Anyone else dealing with LLM cost visibility in CI? Curious what your setup looks like.
+How is your team handling LLM cost visibility in pipelines today? Genuinely curious.
 
 ## Posting notes
 

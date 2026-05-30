@@ -2,19 +2,18 @@
 
 ## Title
 
-I built a zero-dep CLI that finds every LLM API call in your Python code and estimates what it costs
+tokentoll: a CI gate that catches LLM API cost regressions in Python (and JS/TS) before they merge
 
 ## Body
 
-Last month I was reviewing a PR where someone swapped `gpt-4o-mini` for `gpt-4o`. The tests passed, the types checked out, I approved it. Our bill went from $800/month to $12,000/month. One parameter change, invisible in a diff.
+A model swap from `gpt-4o-mini` to `gpt-4o` is roughly 15x more expensive per token. In a normal code diff it looks like a one-word change, indistinguishable from a typo fix. Tests pass, reviewer approves, the cost shows up on next month's invoice.
 
-I looked for a tool that could catch this. Infracost does it for Terraform, but nothing exists for LLM API calls. So I built one.
+I wrote **tokentoll** to catch this in code review. It is a CLI plus GitHub Action that statically analyzes Python (and JS/TS via tree-sitter) for LLM SDK calls, prices them against a 2200+ model catalog from LiteLLM, and posts a PASS/WARN/FAIL verdict on the PR against a policy you control.
 
-**tokentoll** parses your Python with `ast` (and your JS/TS with tree-sitter), finds calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu, Vercel AI SDK, and LangChain.js, and looks up real pricing for 2200+ models. Just merged into [assafelovic/gpt-researcher](https://github.com/assafelovic/gpt-researcher) (27k stars).
+Python coverage: OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu.
 
 ```
-$ pip install tokentoll
-$ tokentoll diff HEAD~1
+$ tokentoll diff main..HEAD
 
 ~ MODIFIED src/agents/summarizer.py:42
   openai | Model: gpt-4o-mini -> gpt-4o
@@ -23,29 +22,42 @@ $ tokentoll diff HEAD~1
 + ADDED src/agents/rewriter.py:35
   openai | Model: gpt-4o
   Monthly: +$26.50
+
+## tokentoll verdict: FAIL
+per-call cost grew 15.0x (threshold 5x)
 ```
 
-The part I'm most proud of technically is the multi-pass constant propagation. Real codebases don't write `model="gpt-4o"` as a literal. They pass it through env vars, class attributes, `**kwargs`, constructor args. tokentoll resolves these:
+The part I'm most proud of technically is the multi-pass constant propagation in the Python scanner. Production codebases rarely write `model="gpt-4o"` as a literal. They pass model names through env vars, class attributes, dict unpacking, kwargs, and constructor arguments. tokentoll iterates until a fixed point and resolves through all of those:
 
 ```python
-DEFAULT_MODEL = os.getenv("MODEL", "gpt-4o")
+DEFAULT_MODEL = os.getenv("MODEL", "gpt-4o-mini")
 
 class Config:
     model: str = DEFAULT_MODEL
 
-config = Config()
-kwargs = {"model": config.model, "max_tokens": 2000}
+cfg = Config()
+kwargs = {"model": cfg.model, "max_tokens": 2000}
 client.chat.completions.create(**kwargs)
-# tokentoll resolves: model="gpt-4o", max_tokens=2000
+# resolved: model="gpt-4o-mini", max_tokens=2000
 ```
 
-Also works as a GitHub Action that comments on PRs with cost impact. You can exclude paths (tests/, examples/) and configure per-path call volume via `.tokentoll.yml`.
+What it does not do.
 
-Zero runtime dependencies. Stdlib only: ast, json, subprocess, argparse. Optional tiktoken for better token estimates.
+- Resolve models loaded from a database or remote config (those fall back to a per-SDK default and get flagged).
+- Predict actual call volume. You configure `calls_per_month` per project or per path.
+- Cross-module import resolution in JS/TS (Python is fine).
+
+Adoption proof so far: merged into [assafelovic/gpt-researcher](https://github.com/assafelovic/gpt-researcher) (27k stars). v0.8.3 (shipped today) fixes a diff-matching bug I caught while validating against their open PR queue: shifted call sites were getting double-counted as REMOVED + ADDED pairs.
+
+Install:
+
+    pip install tokentoll
+    tokentoll scan .
+    tokentoll diff main..HEAD
 
 GitHub: https://github.com/Jwrede/tokentoll
 
-Curious what it finds in your codebase. What patterns am I missing?
+Curious what false positives or SDK patterns it breaks on in your codebase.
 
 ## Posting notes
 

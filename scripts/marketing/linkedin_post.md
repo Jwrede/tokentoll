@@ -1,33 +1,41 @@
 # LinkedIn Post
 
-A single model swap from gpt-4o-mini to gpt-4o increases LLM API costs by 15x.
-These changes are invisible in normal code review.
+A one-word model swap from gpt-4o-mini to gpt-4o is roughly 15x more
+expensive per token, and it looks identical to a typo fix in a code diff.
+Tests pass, reviewer approves, the bill spikes next month.
 
-tokentoll is an open-source CLI tool and GitHub Action that statically
-analyzes Python, JavaScript, and TypeScript for LLM API calls and posts a
-PASS/WARN/FAIL verdict on every PR.
+tokentoll is an open-source CI gate for LLM API cost regressions. It
+statically analyzes Python, JavaScript, and TypeScript for LLM SDK calls,
+prices them against a 2200+ model catalog, and posts a PASS/WARN/FAIL
+verdict on every pull request against a policy you control. With one flag
+set, a budget violation actually blocks the merge.
 
-Just merged into assafelovic/gpt-researcher (27k stars).
+Recently merged into assafelovic/gpt-researcher (27,000 stars on GitHub).
 
-How it works:
-- Parses Python via the ast module, JS/TS via tree-sitter
-- Detects calls to OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu, Vercel AI SDK, LangChain.js
-- Looks up real pricing data (2200+ models)
-- Resolves dynamic model names through variable assignments, env vars, class attributes, kwargs unpacking
-- Scores every PR against a policy you control (max monthly delta, max relative increase, block unknown models)
+What it does.
+- Detects calls from OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain,
+  and Zhipu in Python (via the ast module).
+- Detects calls from the OpenAI Node SDK, Anthropic SDK, Vercel AI SDK,
+  and LangChain.js in JavaScript and TypeScript (via tree-sitter).
+- Resolves model names through variable assignments, env var fallbacks,
+  class attributes, and kwargs unpacking, so real-world code with
+  indirection still produces useful estimates.
+- Evaluates each PR against per-call-site, per-PR, and per-month budgets,
+  with rules for blocking unknown models or unbounded cost growth.
 
-Think Infracost, but for LLM API spend.
+How to try it.
 
-Zero runtime dependencies on the Python side. MIT licensed. Configurable via
-.tokentoll.yml for per-project and per-path overrides, with sensible default
-exclusions for tests, examples, docs, and cookbook code.
+  pip install tokentoll
+  tokentoll diff main..HEAD
 
-Next: context-aware call frequency inference (route handlers vs scripts vs
-batch jobs) and cross-file import resolution for JS/TS.
+Or as a GitHub Action:
 
-pip install tokentoll
-tokentoll scan .
-tokentoll diff HEAD~1
+  uses: Jwrede/tokentoll@v0.8.3
+  with:
+    fail-on-policy-violation: true
+
+Zero telemetry, no API keys required, pricing data ships with the package
+and works offline. MIT licensed.
 
 GitHub: https://github.com/Jwrede/tokentoll
 

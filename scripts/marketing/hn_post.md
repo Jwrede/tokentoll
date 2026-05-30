@@ -1,8 +1,8 @@
-# Show HN: Tokentoll - Static analysis that catches LLM cost changes in code review
+# Show HN: Tokentoll, a CI gate for LLM API cost regressions
 
 ## Title (for HN submit box)
 
-Show HN: Tokentoll - Static analysis that catches LLM cost changes in code review
+Show HN: Tokentoll, a CI gate for LLM API cost regressions
 
 ## URL
 
@@ -10,34 +10,43 @@ https://github.com/Jwrede/tokentoll
 
 ## First comment (post immediately after submitting)
 
-I kept finding model swaps in PRs that looked harmless but caused cost spikes.
-A gpt-4o-mini to gpt-4o change is 15x more expensive per token, and it's
-invisible in a normal diff.
+Quick rundown of what tokentoll is and what it isn't.
 
-tokentoll statically analyzes Python, JavaScript, and TypeScript for LLM API
-calls (OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Vercel AI SDK,
-Zhipu), resolves model names through variable assignments, **kwargs,
-os.getenv()/process.env fallbacks, and looks up real pricing for 2200+ models.
-The interesting technical bit is the multi-pass constant propagation that
-follows model names through class attributes, constructor args, dict unpacking,
-and Vercel AI SDK provider wrappers.
+What it is. A CLI plus GitHub Action that parses Python (ast) and JavaScript/TypeScript (tree-sitter) for LLM SDK calls, prices them against a bundled 2200+ model catalog from LiteLLM, and posts a PASS/WARN/FAIL verdict on every PR against a policy you configure. With `fail-on-policy-violation: true` the check exits non-zero on FAIL, so a budget violation actually blocks the merge.
 
-Example:
+The hook. A one-word model swap from gpt-4o-mini to gpt-4o is roughly 15x more expensive per token and looks identical to a typo fix in a normal diff. Same shape for a max_tokens bump or a new endpoint calling an expensive model.
 
-    $ tokentoll diff HEAD~1
+Detection today.
 
-    ~ MODIFIED src/agents/summarizer.py:42
-      openai | Model: gpt-4o-mini -> gpt-4o
-      Monthly: +$26.20 (15x increase)
+  - Python: OpenAI, Anthropic, Google GenAI, LiteLLM, LangChain, Zhipu
+  - JS/TS: OpenAI Node SDK, Anthropic SDK, Vercel AI SDK, LangChain.js
 
-Also works as a GitHub Action that comments PASS/WARN/FAIL on PRs against a
-policy you define (max_monthly_delta_usd, max_relative_increase,
-block_unknown_models). Zero runtime dependencies (stdlib + tree-sitter for
-JS/TS). Path exclusions and per-path config via .tokentoll.yml.
+Model names are resolved through variable assignments, env var fallbacks (os.getenv, process.env), class attributes, kwargs / object literal unpacking, and Vercel AI SDK provider wrappers like `openai("gpt-4o")`. Multi-pass constant propagation iterates to a fixed point.
 
-Adoption so far: merged into assafelovic/gpt-researcher (27k stars) and a
-handful of smaller AI apps. Would love feedback on SDK patterns I'm missing or
-false positives you run into.
+Policy rules.
+
+  - max_monthly_delta_usd: aggregate cap
+  - max_callsite_monthly_usd: per-call-site cap
+  - max_relative_increase: per-call cost multiplier cap
+  - block_unknown_models: any unpriced or unresolved model is a violation
+
+There's also an MCP server (`tokentoll-mcp`) so Claude Code or other MCP hosts can run scan and diff inside an agent conversation.
+
+Honest limitations.
+
+  - Static analysis only. Models loaded from a database or remote config fall back to a per-SDK default and the call site is flagged.
+  - Token estimates use a chars/4 heuristic unless tiktoken is installed.
+  - JS/TS resolution is same-file. An imported model constant from another module is treated as dynamic.
+
+Adoption so far is mostly one largish repo (assafelovic/gpt-researcher, 27k stars) plus a few smaller AI apps. v0.8.3 shipped today and fixes a diff-matching bug I caught while running tokentoll against gpt-researcher's open PRs: shifted call sites were getting reported as REMOVED + ADDED pairs even when the call shape did not change.
+
+Install:
+
+    pip install tokentoll
+    tokentoll scan .
+    tokentoll diff main..HEAD
+
+Would value pointers to SDK patterns I'm missing or pathological repos worth testing against.
 
 ## Posting notes
 
