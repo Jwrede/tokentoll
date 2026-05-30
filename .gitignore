@@ -16,3 +16,15 @@ htmlcov/
 venv/
 *.so
 .DS_Store
+
+# Internal: outreach tracker, launch plan, marketing copy, PR helpers,
+# raw demo recording artifacts. demo/demo.gif stays tracked because the
+# README hero links to it.
+prs.md
+todo.md
+scripts/marketing/
+scripts/pr-template/
+demo/app.py
+demo/demo.cast
+demo/record.sh
+demo/record_demo.sh
