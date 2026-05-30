@@ -44,7 +44,14 @@ def _diff_file(
     matched_new: set[int] = set()
     diffs: list[CallDiff] = []
 
+    # Pair calls that have identical shape regardless of line distance. A
+    # refactor that shifts unchanged call sites up or down the file should
+    # not surface them as REMOVED + ADDED.
+    _pair_identical(old_calls, new_calls, matched_old, matched_new)
+
     for ni, nc in enumerate(new_calls):
+        if ni in matched_new:
+            continue
         best_oi = _find_best_match(nc, old_calls, matched_old)
         if best_oi is not None:
             matched_old.add(best_oi)
@@ -124,6 +131,37 @@ def _diff_file(
             )
 
     return diffs
+
+
+def _pair_identical(
+    old_calls: list[LLMCall],
+    new_calls: list[LLMCall],
+    matched_old: set[int],
+    matched_new: set[int],
+) -> None:
+    def shape(c: LLMCall) -> tuple:
+        return (
+            c.sdk,
+            c.call_type,
+            c.model,
+            c.model_is_literal,
+            c.max_tokens,
+            c.raw_expression,
+        )
+
+    old_by_shape: dict[tuple, list[int]] = {}
+    for oi, oc in enumerate(old_calls):
+        old_by_shape.setdefault(shape(oc), []).append(oi)
+
+    new_by_shape: dict[tuple, list[int]] = {}
+    for ni, nc in enumerate(new_calls):
+        new_by_shape.setdefault(shape(nc), []).append(ni)
+
+    for s, news in new_by_shape.items():
+        olds = old_by_shape.get(s, [])
+        for oi, ni in zip(olds, news):
+            matched_old.add(oi)
+            matched_new.add(ni)
 
 
 def _find_best_match(
