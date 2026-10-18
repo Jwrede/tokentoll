@@ -73,7 +73,7 @@ def test_estimate_dynamic_model_uses_sdk_default():
 
 def test_estimate_anthropic_model():
     engine = PricingEngine()
-    call = _make_call("claude-sonnet-4-20250514", sdk="anthropic", max_tokens=1024)
+    call = _make_call("claude-sonnet-4-5", sdk="anthropic", max_tokens=1024)
     est = engine.estimate(call, calls_per_month=500)
     assert est.model_found is True
     assert est.monthly_estimate is not None

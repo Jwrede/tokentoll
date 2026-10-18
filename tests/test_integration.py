@@ -115,7 +115,7 @@ def test_diff_detects_added_call(git_repo):
     code = textwrap.dedent("""\
         from anthropic import Anthropic
         client = Anthropic()
-        client.messages.create(model="claude-sonnet-4-20250514", max_tokens=1024, messages=[])
+        client.messages.create(model="claude-sonnet-4-5", max_tokens=1024, messages=[])
     """)
     (git_repo / "app.py").write_text(code)
     subprocess.run(["git", "add", "app.py"], cwd=git_repo, capture_output=True, check=True)
