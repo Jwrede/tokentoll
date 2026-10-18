@@ -34,6 +34,8 @@ jobs:
         run: |
           git diff --quiet src/tokentoll/pricing/data/model_prices.json && exit 0
           BRANCH="auto/update-pricing-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add src/tokentoll/pricing/data/model_prices.json
           git commit -m "Update bundled pricing data"

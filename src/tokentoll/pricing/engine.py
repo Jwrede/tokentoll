@@ -21,8 +21,8 @@ _DEFAULT_OUTPUT_RATIO = 0.25
 
 _SDK_DEFAULT_MODELS: dict[str, str] = {
     "openai": "gpt-4o",
-    "anthropic": "claude-sonnet-4-20250514",
-    "google_genai": "gemini-2.0-flash",
+    "anthropic": "claude-sonnet-4-5",
+    "google_genai": "gemini-2.5-flash",
     "litellm": "gpt-4o",
     "langchain": "gpt-4o",
     "zai": "zai/glm-4.6",
