@@ -163,7 +163,7 @@ def test_estimate_dynamic_anthropic_uses_claude_default():
     engine = PricingEngine()
     est = engine.estimate(call)
     assert est.model_found is True
-    assert est.used_default_model == "claude-sonnet-4-20250514"
+    assert est.used_default_model == "claude-sonnet-4-5"
 
 
 def test_estimate_dynamic_google_uses_gemini_default():
@@ -179,7 +179,7 @@ def test_estimate_dynamic_google_uses_gemini_default():
     engine = PricingEngine()
     est = engine.estimate(call)
     assert est.model_found is True
-    assert est.used_default_model == "gemini-2.0-flash"
+    assert est.used_default_model == "gemini-2.5-flash"
 
 
 def test_estimate_per_sdk_config_overrides_builtin():
