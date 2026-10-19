@@ -27238,5 +27238,13 @@
     "max_input_tokens": 500000,
     "max_output_tokens": 500000,
     "mode": "chat"
+  },
+  "together_ai/deepseek-ai/DeepSeek-V4.1-Flash-1017": {
+    "input_cost_per_token": 3e-07,
+    "output_cost_per_token": 1.2e-06,
+    "cache_read_input_token_cost": 6e-09,
+    "max_input_tokens": 1048576,
+    "max_output_tokens": null,
+    "mode": "chat"
   }
 }
