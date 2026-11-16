@@ -10290,7 +10290,7 @@
   "groq/openai/gpt-oss-safeguard-20b": {
     "input_cost_per_token": 7.5e-08,
     "output_cost_per_token": 3e-07,
-    "cache_read_input_token_cost": 3.7e-08,
+    "cache_read_input_token_cost": 3.75e-08,
     "max_input_tokens": 131072,
     "max_output_tokens": 65536,
     "mode": "chat"
@@ -12499,7 +12499,7 @@
     "input_cost_per_token": 2e-06,
     "output_cost_per_token": 1e-05,
     "cache_read_input_token_cost": 2e-07,
-    "max_input_tokens": null,
+    "max_input_tokens": 1048576,
     "max_output_tokens": null,
     "mode": "chat"
   },
@@ -32381,6 +32381,22 @@
     "cache_read_input_token_cost": 7.5e-08,
     "max_input_tokens": 200000,
     "max_output_tokens": 65536,
+    "mode": "chat"
+  },
+  "cloudflare/@cf/thinkingmachines/inkling-2-small": {
+    "input_cost_per_token": 3e-07,
+    "output_cost_per_token": 1e-06,
+    "cache_read_input_token_cost": 1e-07,
+    "max_input_tokens": 1048576,
+    "max_output_tokens": null,
+    "mode": "chat"
+  },
+  "nebius/thinkingmachines/Inkling-2-Small": {
+    "input_cost_per_token": 3e-07,
+    "output_cost_per_token": 1e-06,
+    "cache_read_input_token_cost": 6e-08,
+    "max_input_tokens": 1048576,
+    "max_output_tokens": null,
     "mode": "chat"
   }
 }
